@@ -1097,6 +1097,16 @@ def register_routes(app: Flask) -> None:
     def logo_asset():
         return send_from_directory(BASE_DIR, "Logo.png")
 
+    # Compatibility routes: browsers or old bookmarks may request these directly.
+    @app.route("/logo.png")
+    def logo_png():
+        return send_from_directory(BASE_DIR, "Logo.png")
+
+    @app.route("/favicon.ico")
+    def favicon():
+        # Serve the PNG logo as favicon; most browsers accept this.
+        return send_from_directory(BASE_DIR, "Logo.png")
+
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
         if g.system_initialized:
