@@ -31,6 +31,11 @@
         <textarea class="form-control" name="important_contacts" rows="6" maxlength="4000" placeholder="Zum Beispiel: Notar, Pfarrer, enge Freunde, Vereinskontakte oder andere Personen, die informiert werden sollen." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['important_contacts'] }}</textarea>
       </div>
       <div class="col-12">
+        <label class="form-label">Bucket List (für Sie)</label>
+        <textarea class="form-control" name="bucket_list" rows="6" maxlength="4000" placeholder="Zum Beispiel: Orte, die Sie noch sehen möchten; Gespräche, die Ihnen wichtig sind; Dinge, die Sie unbedingt noch tun oder klären wollen. Diese Liste darf leicht sein, ehrlich und ganz für Sie." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['bucket_list'] }}</textarea>
+        <div class="form-text">Diese Liste ist kein „Muss“. Sie kann auch helfen, in schweren Phasen wieder an Lebenswünsche zu erinnern.</div>
+      </div>
+      <div class="col-12">
         <label class="form-label">Externe Links</label>
         <textarea class="form-control" name="external_links" rows="4" maxlength="4000" placeholder="Zum Beispiel: Affilio, Vorsorgeportale oder andere wichtige externe Seiten mit Bezug zu Ihrem Nachlass." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['external_links'] }}</textarea>
       </div>

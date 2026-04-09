@@ -312,6 +312,7 @@ def init_db(app: Flask) -> None:
         farewell_message TEXT NOT NULL DEFAULT '',
         asset_notes TEXT NOT NULL DEFAULT '',
         ceremony_notes TEXT NOT NULL DEFAULT '',
+        bucket_list TEXT NOT NULL DEFAULT '',
         important_contacts TEXT NOT NULL DEFAULT '',
         external_links TEXT NOT NULL DEFAULT '',
         updated_by INTEGER NOT NULL,
@@ -404,6 +405,12 @@ def init_db(app: Flask) -> None:
     db.executescript(schema)
     db.execute("INSERT OR IGNORE INTO smtp_settings (id, updated_at) VALUES (1, '')")
     db.execute("INSERT OR IGNORE INTO app_settings (id, timezone, updated_at) VALUES (1, 'Europe/Berlin', '')")
+
+    # Lightweight migration: add new columns without a full migration framework.
+    wishes_cols = {row["name"] for row in db.execute("PRAGMA table_info(wishes)").fetchall()}
+    if "bucket_list" not in wishes_cols:
+        db.execute("ALTER TABLE wishes ADD COLUMN bucket_list TEXT NOT NULL DEFAULT ''")
+
     db.commit()
     db.close()
 
@@ -1700,24 +1707,25 @@ def register_routes(app: Flask) -> None:
         if request.method == "POST":
             if g.user["id"] != profile["owner_user_id"]:
                 abort(403)
-            g.db.execute(
-                """
-                UPDATE wishes SET
-                    farewell_message = ?, asset_notes = ?, ceremony_notes = ?,
-                    important_contacts = ?, external_links = ?, updated_by = ?, updated_at = ?
-                WHERE profile_id = ?
-                """,
-                (
-                    request.form.get("farewell_message", "").strip(),
-                    request.form.get("asset_notes", "").strip(),
-                    request.form.get("ceremony_notes", "").strip(),
-                    request.form.get("important_contacts", "").strip(),
-                    request.form.get("external_links", "").strip(),
-                    g.user["id"],
-                    utcnow(),
-                    profile["id"],
-                ),
-            )
+                g.db.execute(
+                    """
+                    UPDATE wishes SET
+                        farewell_message = ?, asset_notes = ?, ceremony_notes = ?,
+                        bucket_list = ?, important_contacts = ?, external_links = ?, updated_by = ?, updated_at = ?
+                    WHERE profile_id = ?
+                    """,
+                    (
+                        request.form.get("farewell_message", "").strip(),
+                        request.form.get("asset_notes", "").strip(),
+                        request.form.get("ceremony_notes", "").strip(),
+                        request.form.get("bucket_list", "").strip(),
+                        request.form.get("important_contacts", "").strip(),
+                        request.form.get("external_links", "").strip(),
+                        g.user["id"],
+                        utcnow(),
+                        profile["id"],
+                    ),
+                )
             g.db.commit()
             log_event("wishes_update", "wishes", "Letzte Wünsche aktualisiert", profile["id"])
             push_toast("Die letzten Wünsche wurden gespeichert.", "success", "Änderungen gespeichert")
