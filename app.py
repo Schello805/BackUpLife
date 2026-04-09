@@ -657,6 +657,7 @@ def create_app() -> Flask:
     # Stable version/project globals so templates keep working even if context_processor changes.
     app.jinja_env.globals["APP_VERSION"] = APP_VERSION
     app.jinja_env.globals["GITHUB_PROJECT_URL"] = GITHUB_PROJECT_URL
+    app.jinja_env.globals["get_category_ui"] = get_category_ui
 
     @app.before_request
     def before_request() -> None:

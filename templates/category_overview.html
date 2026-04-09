@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 {% block title %}{{ category_label(category_key) }}{% endblock %}
 {% block content %}
+  {% set ui = category_ui if category_ui else (get_category_ui(category_key) if get_category_ui is defined else none) %}
   <div class="page-shell p-4 p-lg-5 mb-4">
     <div class="d-flex flex-column flex-xl-row justify-content-between gap-3 mb-4">
       <div>
@@ -116,7 +117,7 @@
             <table class="table align-middle">
               <thead class="table-light">
                 <tr>
-                  {% set cols = (category_ui.table_columns if category_ui else []) %}
+                  {% set cols = (ui.table_columns if ui else []) %}
                   {% if cols and cols|length >= 1 %}
                     {% for col in cols %}
                       <th>{{ col.label }}</th>

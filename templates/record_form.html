@@ -6,7 +6,8 @@
       <div>
         <p class="section-label mb-2">{{ category_label(category_key) }}</p>
         <h1 class="h3 mb-2">{% if record %}Eintrag bearbeiten{% else %}Neuen Eintrag anlegen{% endif %}</h1>
-        <p class="text-secondary mb-0">{{ (category_ui.form_intro if category_ui else '') or 'Denken Sie dabei nicht nur an Vollständigkeit, sondern an Verständlichkeit. Hinterlegen Sie genau das, was jemand in einer belastenden Situation schnell begreifen und nutzen kann.' }}</p>
+        {% set ui = category_ui if category_ui else (get_category_ui(category_key) if get_category_ui is defined else none) %}
+        <p class="text-secondary mb-0">{{ (ui.form_intro if ui else '') or 'Denken Sie dabei nicht nur an Vollständigkeit, sondern an Verständlichkeit. Hinterlegen Sie genau das, was jemand in einer belastenden Situation schnell begreifen und nutzen kann.' }}</p>
       </div>
       <a class="btn btn-outline-secondary" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category_key) }}">Zurück</a>
     </div>
@@ -56,7 +57,7 @@
         <label class="form-label">Titel</label>
         <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>
       </div>
-      {% set f = category_ui.fields if category_ui else {} %}
+      {% set f = ui.fields if ui else {} %}
       {% if not f or (f.provider and f.provider.show) %}
         <div class="col-md-6">
           <label class="form-label">{{ (f.provider.label if f and f.provider else 'Anbieter / Vertragspartner') }}</label>
