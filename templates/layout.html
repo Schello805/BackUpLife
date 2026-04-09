@@ -148,8 +148,9 @@
             <a href="{{ url_for('privacy') }}" class="link-secondary">Datenschutz</a>
             <a href="{{ url_for('cookies_page') }}" class="link-secondary">Cookies</a>
             <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}" target="_blank" rel="noreferrer" class="link-secondary">GitHub</a>
-            {% set version_value = app_version|default(APP_VERSION, true) %}
-            <span class="text-secondary">Version: v{{ version_value }}</span>
+            {% if update_info and update_info.status == 'update_available' %}
+              <span class="badge text-bg-warning">Update verfügbar: {{ update_info.latest|replace('v','') }}</span>
+            {% endif %}
             {% if build_info and build_info.build_sha %}
               <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}/commit/{{ build_info.build_sha }}" target="_blank" rel="noreferrer" class="link-secondary">Build: {{ build_info.build_sha }}</a>
             {% endif %}
