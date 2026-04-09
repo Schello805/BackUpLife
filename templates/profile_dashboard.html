@@ -39,53 +39,53 @@
 	            </div>
 	            <h2 class="h5 mb-2">{{ category.label }}</h2>
 	            <p class="text-secondary small mb-4">Hier liegen die Informationen, die Angehörige später nicht erst zusammensuchen sollten: aktuell {{ category.records_count }} Einträge und {{ category.documents_count }} Dokumente.</p>
-	            {% if g.user['id'] == profile['owner_user_id'] %}
-	              <div class="d-flex justify-content-end mb-3">
-	                <div class="dropdown">
-	                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">Status ändern</button>
-	                  <ul class="dropdown-menu dropdown-menu-end">
-	                    {% if category.status_state == 'na' %}
-	                      <li>
-	                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-	                          <input type="hidden" name="action" value="applicable">
-	                          <input type="hidden" name="next" value="{{ request.full_path }}">
-	                          <button class="dropdown-item" type="submit">Wieder relevant</button>
-	                        </form>
-	                      </li>
-	                    {% else %}
-	                      {% if category.is_complete %}
-	                        <li>
-	                          <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-	                            <input type="hidden" name="action" value="open">
-	                            <input type="hidden" name="next" value="{{ request.full_path }}">
-	                            <button class="dropdown-item" type="submit">Als offen markieren</button>
-	                          </form>
-	                        </li>
-	                      {% else %}
-	                        <li>
-	                          <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-	                            <input type="hidden" name="action" value="complete">
-	                            <input type="hidden" name="next" value="{{ request.full_path }}">
-	                            <button class="dropdown-item" type="submit">Als fertig markieren</button>
-	                          </form>
-	                        </li>
-	                      {% endif %}
-	                      <li><hr class="dropdown-divider"></li>
-	                      <li>
-	                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-	                          <input type="hidden" name="action" value="na">
-	                          <input type="hidden" name="next" value="{{ request.full_path }}">
-	                          <button class="dropdown-item" type="submit">Nicht zutreffend</button>
-	                        </form>
-	                      </li>
-	                    {% endif %}
-	                  </ul>
-	                </div>
-	              </div>
-	            {% endif %}
-	            <a class="btn btn-primary btn-sm mt-auto" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category.key) }}">Kategorie öffnen</a>
-	          </div>
-	        </div>
+		            <div class="d-flex justify-content-between align-items-center mt-auto gap-2 flex-wrap">
+		              <a class="btn btn-primary btn-sm" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category.key) }}">Kategorie öffnen</a>
+		              {% if g.user['id'] == profile['owner_user_id'] %}
+		                <div class="dropdown">
+		                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">Status ändern</button>
+		                  <ul class="dropdown-menu dropdown-menu-end">
+		                    {% if category.status_state == 'na' %}
+		                      <li>
+		                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+		                          <input type="hidden" name="action" value="applicable">
+		                          <input type="hidden" name="next" value="{{ request.full_path }}">
+		                          <button class="dropdown-item" type="submit">Wieder relevant</button>
+		                        </form>
+		                      </li>
+		                    {% else %}
+		                      {% if category.is_complete %}
+		                        <li>
+		                          <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+		                            <input type="hidden" name="action" value="open">
+		                            <input type="hidden" name="next" value="{{ request.full_path }}">
+		                            <button class="dropdown-item" type="submit">Als offen markieren</button>
+		                          </form>
+		                        </li>
+		                      {% else %}
+		                        <li>
+		                          <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+		                            <input type="hidden" name="action" value="complete">
+		                            <input type="hidden" name="next" value="{{ request.full_path }}">
+		                            <button class="dropdown-item" type="submit">Als fertig markieren</button>
+		                          </form>
+		                        </li>
+		                      {% endif %}
+		                      <li><hr class="dropdown-divider"></li>
+		                      <li>
+		                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+		                          <input type="hidden" name="action" value="na">
+		                          <input type="hidden" name="next" value="{{ request.full_path }}">
+		                          <button class="dropdown-item" type="submit">Nicht zutreffend</button>
+		                        </form>
+		                      </li>
+		                    {% endif %}
+		                  </ul>
+		                </div>
+		              {% endif %}
+		            </div>
+		          </div>
+		        </div>
 	      {% endif %}
 	    {% endfor %}
   </div>
