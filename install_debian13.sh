@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/opt/aeterna"
-SERVICE_FILE="/etc/systemd/system/aeterna.service"
-NGINX_FILE="/etc/nginx/sites-available/aeterna"
+APP_DIR="/opt/backuplife"
+SERVICE_FILE="/etc/systemd/system/backuplife.service"
+NGINX_FILE="/etc/nginx/sites-available/backuplife"
 DOMAIN="${1:-_}"
 
 apt-get update
@@ -25,7 +25,7 @@ fi
 
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=Aeterna Nachlassverwaltung
+Description=BackUpLife
 After=network.target
 
 [Service]
@@ -56,13 +56,13 @@ server {
 }
 EOF
 
-ln -sf "$NGINX_FILE" /etc/nginx/sites-enabled/aeterna
+ln -sf "$NGINX_FILE" /etc/nginx/sites-enabled/backuplife
 rm -f /etc/nginx/sites-enabled/default
 
 systemctl daemon-reload
-systemctl enable --now aeterna
+systemctl enable --now backuplife
 nginx -t
 systemctl restart nginx
 
-echo "Aeterna wurde installiert."
-echo "Bitte .env in $APP_DIR anpassen und den Dienst mit 'systemctl restart aeterna' neu starten."
+echo "BackUpLife wurde installiert."
+echo "Bitte .env in $APP_DIR anpassen und den Dienst mit 'systemctl restart backuplife' neu starten."

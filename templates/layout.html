@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Aeterna{% endblock %}</title>
+    <title>{% block title %}BackUpLife{% endblock %}</title>
     <link rel="icon" type="image/png" href="{{ url_for('logo_asset') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
@@ -14,10 +14,10 @@
         <nav class="navbar navbar-expand-lg topbar no-print">
           <div class="container py-3">
             <a class="brand-lockup" href="{{ url_for('dashboard') }}">
-              <img src="{{ url_for('logo_asset') }}" alt="Aeterna Logo" class="brand-logo">
+              <img src="{{ url_for('logo_asset') }}" alt="BackUpLife Logo" class="brand-logo">
               <div class="brand-wordmark">
-                <strong>Aeterna</strong>
-                <span>Digitaler Nachlass</span>
+                <strong>BackUpLife</strong>
+                <span>Alles Wichtige an einem Ort. Für alle Fälle.</span>
               </div>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
@@ -82,8 +82,8 @@
           <div class="d-flex align-items-center gap-3">
             <img src="{{ url_for('logo_asset') }}" alt="" class="brand-logo">
             <div class="small">
-              <div class="fw-semibold">Aeterna</div>
-              <div class="text-secondary">Sichere Verwaltung eines digitalen Nachlasses mit nachvollziehbaren Freigaben.</div>
+              <div class="fw-semibold">BackUpLife</div>
+              <div class="text-secondary">Alles Wichtige an einem Ort. Für alle Fälle.</div>
               {% if g.user and active_profile %}
                 <div class="mt-1">
                   <span class="fw-semibold">Ihre Nachlass-URL:</span>
@@ -110,7 +110,7 @@
       <div class="cookie-banner-inner">
         <div class="small">
           <div class="fw-semibold mb-1">Cookie-Hinweis</div>
-          <div class="text-secondary">Aeterna verwendet nur technisch notwendige Cookies (z. B. für die Anmeldung). Kein Tracking. Details in <a href="{{ url_for('cookies_page') }}">Cookies</a> und <a href="{{ url_for('privacy') }}">Datenschutz</a>.</div>
+          <div class="text-secondary">BackUpLife verwendet nur technisch notwendige Cookies (z. B. für die Anmeldung). Kein Tracking. Details in <a href="{{ url_for('cookies_page') }}">Cookies</a> und <a href="{{ url_for('privacy') }}">Datenschutz</a>.</div>
         </div>
         <button class="btn btn-primary btn-sm" id="cookieBannerOk" type="button">Verstanden</button>
       </div>
@@ -124,7 +124,7 @@
       });
 
       (function () {
-        const key = 'aeterna_cookie_notice_ack';
+        const key = 'backuplife_cookie_notice_ack';
         const banner = document.getElementById('cookieBanner');
         const ok = document.getElementById('cookieBannerOk');
         if (!banner || !ok) return;

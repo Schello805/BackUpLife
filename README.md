@@ -1,6 +1,8 @@
-# Aeterna
+# BackUpLife
 
-Aeterna ist eine seriöse, deutschsprachige WebApp zur Verwaltung eines digitalen Nachlasses für Familien. Die Anwendung trennt Admin, Ersteller und Leser sauber, bietet persönliche Nachlass-URLs pro Ersteller, echte Freigaben bis auf Kategorie-Ebene, verschlüsselte Speicherung sensibler Zugangsdaten, Audit-Logs und Druckexporte.
+BackUpLife ist eine seriöse, deutschsprachige WebApp, um wichtige Informationen für alle Fälle geordnet zu hinterlassen. Die Anwendung trennt Admin, Ersteller und Leser sauber, bietet persönliche URLs pro Ersteller, Freigaben bis auf Kategorie-Ebene, verschlüsselte Speicherung sensibler Zugangsdaten, Audit-Logs und Druckexporte.
+
+Slogan: **Alles Wichtige an einem Ort. Für alle Fälle.**
 
 ## Funktionsumfang
 

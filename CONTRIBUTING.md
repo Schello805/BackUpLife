@@ -1,6 +1,6 @@
 # Contributing
 
-Vielen Dank für Ihr Interesse an Aeterna.
+Vielen Dank für Ihr Interesse an BackUpLife.
 
 ## Grundsätze
 

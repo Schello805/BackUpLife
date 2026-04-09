@@ -1057,15 +1057,15 @@ def render_email_html(
           ">{button_label}</a>
         </div>
         """
-    footer_text = footer_note or "Diese Nachricht wurde von Aeterna erstellt, um digitale Nachlassinformationen nachvollziehbar und sicher zu begleiten."
+    footer_text = footer_note or "Diese Nachricht wurde von BackUpLife erstellt, um wichtige Informationen nachvollziehbar und sicher zu begleiten."
     return f"""
     <!doctype html>
     <html lang="de">
       <body style="margin:0;padding:32px 16px;background:#eef4f8;font-family:Arial,sans-serif;color:#103654;">
         <div style="max-width:700px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 24px 80px rgba(16,54,84,0.12);">
           <div style="padding:34px 40px;background:linear-gradient(135deg,#103654,#206ca6);color:#ffffff;">
-            <img src="{logo_url}" alt="Aeterna" style="width:72px;height:72px;object-fit:contain;display:block;margin-bottom:18px;">
-            <div style="letter-spacing:0.22em;text-transform:uppercase;font-size:12px;opacity:0.82;font-weight:700;">Aeterna</div>
+            <img src="{logo_url}" alt="BackUpLife" style="width:72px;height:72px;object-fit:contain;display:block;margin-bottom:18px;">
+            <div style="letter-spacing:0.22em;text-transform:uppercase;font-size:12px;opacity:0.82;font-weight:700;">BackUpLife</div>
             <h1 style="margin:14px 0 10px;font-size:30px;line-height:1.2;">{title}</h1>
             <p style="margin:0;color:rgba(255,255,255,0.84);font-size:16px;line-height:1.7;">{lead}</p>
           </div>
@@ -1073,7 +1073,7 @@ def render_email_html(
             {lines_html}
             {button_html}
             <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(16,54,84,0.12);font-size:13px;color:#6e8395;line-height:1.7;">
-              <p style="margin:0 0 8px;"><strong style="color:#103654;">Aeterna · Digitaler Nachlass</strong></p>
+              <p style="margin:0 0 8px;"><strong style="color:#103654;">BackUpLife</strong></p>
               <p style="margin:0 0 8px;">{footer_text}</p>
               <p style="margin:0;">Falls der Button nicht funktioniert, nutzen Sie bitte diesen Link:<br><span style="word-break:break-all;color:#206ca6;">{button_url or request.url_root.rstrip('/')}</span></p>
             </div>
@@ -1095,7 +1095,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/branding/logo.png")
     def logo_asset():
-        return send_from_directory(BASE_DIR, "Logo_aeterna.png")
+        return send_from_directory(BASE_DIR, "Logo.png")
 
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
@@ -1123,7 +1123,7 @@ def register_routes(app: Flask) -> None:
                     push_toast(
                         "Die Erstkonfiguration wurde erfolgreich abgeschlossen. Sie können jetzt mit Ihrem Nachlass starten.",
                         "success",
-                        "Aeterna ist bereit",
+                        "BackUpLife ist bereit",
                     )
                     return redirect(url_for("dashboard"))
                 except sqlite3.IntegrityError:
@@ -1224,7 +1224,7 @@ def register_routes(app: Flask) -> None:
                 send_test_or_reset_mail(
                     smtp_settings,
                     user["email"],
-                    "Aeterna Passwort zurücksetzen",
+                    "BackUpLife Passwort zurücksetzen",
                     f"Bitte öffnen Sie diesen Link, um Ihr Passwort zurückzusetzen:\n\n{reset_url}\n",
                     render_email_html(
                         "Passwort zurücksetzen",
@@ -1235,7 +1235,7 @@ def register_routes(app: Flask) -> None:
                         ],
                         "Passwort jetzt zurücksetzen",
                         reset_url,
-                        "Diese E-Mail wurde versendet, weil für Ihr Aeterna-Konto ein Passwort-Reset angefordert wurde.",
+                        "Diese E-Mail wurde versendet, weil für Ihr BackUpLife-Konto ein Passwort-Reset angefordert wurde.",
                     ),
                 )
                 log_event("password_reset_request", "auth", f"Reset angefordert für {email}")
@@ -1900,18 +1900,18 @@ def register_routes(app: Flask) -> None:
             send_test_or_reset_mail(
                 smtp_settings,
                 grantee["email"],
-                "Aeterna Freigabe",
+                "BackUpLife Freigabe",
                 f"Ihnen wurde Zugriff auf {profile['title']} gewährt.",
                 render_email_html(
                     "Neue Freigabe erhalten",
-                    f"Für Sie wurde ein neuer Zugriff in Aeterna freigegeben: {profile['title']}.",
+                    f"Für Sie wurde ein neuer Zugriff in BackUpLife freigegeben: {profile['title']}.",
                     [
                         f"Freigabeumfang: {category_label(category_key) if category_key else 'Gesamter Nachlass'}",
                         "Melden Sie sich mit Ihrem Benutzerkonto an, um den freigegebenen Bereich zu öffnen.",
                     ],
                     "Zur Anmeldung",
                     url_for("login", _external=True),
-                    "Sie erhalten diese Nachricht, weil Ihnen ein Aeterna-Nachlassbereich freigegeben wurde.",
+                    "Sie erhalten diese Nachricht, weil Ihnen ein BackUpLife-Bereich freigegeben wurde.",
                 ),
             )
             log_event(
@@ -2051,18 +2051,18 @@ def register_routes(app: Flask) -> None:
                 success, message = send_test_or_reset_mail(
                     refreshed,
                     request.form.get("test_recipient", "").strip(),
-                    "Aeterna Test-E-Mail",
+                    "BackUpLife Test-E-Mail",
                     "Die SMTP-Konfiguration funktioniert.",
                     render_email_html(
                         "SMTP-Test erfolgreich",
-                        "Diese Testnachricht bestätigt, dass Ihre SMTP-Konfiguration in Aeterna grundsätzlich funktioniert.",
+                        "Diese Testnachricht bestätigt, dass Ihre SMTP-Konfiguration in BackUpLife grundsätzlich funktioniert.",
                         [
                             "Sie können jetzt Passwort-Reset-Mails und Freigabebenachrichtigungen im selben Design versenden.",
                             "Bitte prüfen Sie auch Spam-Ordner und Absenderdarstellung Ihres Mail-Providers.",
                         ],
-                        "Aeterna öffnen",
+                        "BackUpLife öffnen",
                         url_for("admin", _external=True),
-                        "Diese Testmail wurde manuell im Adminbereich von Aeterna ausgelöst.",
+                        "Diese Testmail wurde manuell im Adminbereich von BackUpLife ausgelöst.",
                     ),
                 )
                 push_toast(message, "success" if success else "danger", "SMTP-Test")
