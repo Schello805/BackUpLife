@@ -3009,12 +3009,22 @@ self.addEventListener('fetch', (event) => {
         if request.method == "POST":
             if g.user["id"] != profile["owner_user_id"]:
                 abort(403)
+            delete_idx_raw = (request.form.get("bucket_delete") or "").strip()
+            delete_idx: int | None = None
+            if delete_idx_raw.isdigit():
+                try:
+                    delete_idx = int(delete_idx_raw)
+                except ValueError:
+                    delete_idx = None
             bucket_items: list[dict[str, Any]] = []
             idx = 0
             while True:
                 text_key = f"bucket_text_{idx}"
                 if text_key not in request.form:
                     break
+                if delete_idx is not None and idx == delete_idx:
+                    idx += 1
+                    continue
                 text = request.form.get(text_key, "").strip()
                 done = bool(request.form.get(f"bucket_done_{idx}"))
                 if text:

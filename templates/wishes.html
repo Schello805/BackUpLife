@@ -53,14 +53,37 @@
 
           <div class="list-group">
             {% for item in bucket_items %}
-              <label class="list-group-item d-flex gap-3 align-items-start">
-                <input class="form-check-input mt-1" type="checkbox" name="bucket_done_{{ loop.index0 }}" {% if item.done %}checked{% endif %} {% if g.user['id'] != profile['owner_user_id'] %}disabled{% endif %}>
-                <input type="hidden" name="bucket_text_{{ loop.index0 }}" value="{{ item.text }}">
-                <span class="flex-grow-1 {% if item.done %}text-decoration-line-through text-secondary{% endif %}">{{ item.text }}</span>
-                {% if not item.done %}
-                  <span class="badge text-bg-warning">offen</span>
-                {% endif %}
-              </label>
+              {% if g.user['id'] == profile['owner_user_id'] %}
+                <div class="list-group-item">
+                  <div class="d-flex gap-3 align-items-start">
+                    <input class="form-check-input mt-1" type="checkbox" name="bucket_done_{{ loop.index0 }}" {% if item.done %}checked{% endif %}>
+                    <div class="flex-grow-1">
+                      <input
+                        class="form-control form-control-sm {% if item.done %}text-decoration-line-through text-secondary{% endif %}"
+                        name="bucket_text_{{ loop.index0 }}"
+                        maxlength="200"
+                        value="{{ item.text }}"
+                        aria-label="Bucket List Eintrag {{ loop.index }}"
+                        required
+                      >
+                      <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div class="small text-secondary">
+                          {% if item.done %}Erledigt{% else %}Offen{% endif %}
+                        </div>
+                        <button class="btn btn-outline-danger btn-sm" type="submit" name="bucket_delete" value="{{ loop.index0 }}" onclick="return confirm('Eintrag wirklich löschen?')">Löschen</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% else %}
+                <label class="list-group-item d-flex gap-3 align-items-start">
+                  <input class="form-check-input mt-1" type="checkbox" {% if item.done %}checked{% endif %} disabled>
+                  <span class="flex-grow-1 {% if item.done %}text-decoration-line-through text-secondary{% endif %}">{{ item.text }}</span>
+                  {% if not item.done %}
+                    <span class="badge text-bg-warning">offen</span>
+                  {% endif %}
+                </label>
+              {% endif %}
             {% else %}
               <div class="list-group-item text-secondary">Noch keine Punkte. Wenn Sie möchten, starten Sie klein: ein Gedanke reicht.</div>
             {% endfor %}
