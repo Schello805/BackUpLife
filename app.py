@@ -97,6 +97,175 @@ APP_CATEGORIES = [
     ("home_network", "Heimnetz & Smarthome"),
 ]
 
+DEFAULT_CATEGORY_UI: dict[str, Any] = {
+    "form_intro": "Denken Sie dabei nicht nur an Vollständigkeit, sondern an Verständlichkeit. Hinterlegen Sie genau das, was jemand in einer belastenden Situation schnell begreifen und nutzen kann.",
+    "fields": {
+        "provider": {"show": True, "label": "Anbieter / Vertragspartner", "placeholder": "", "help": ""},
+        "website": {"show": True, "label": "Website / URL", "placeholder": "https://...", "help": ""},
+        "account_username": {"show": True, "label": "Benutzername", "placeholder": "", "help": ""},
+        "account_password": {"show": True, "label": "Passwort / Geheimnis", "placeholder": "", "help": ""},
+        "reference_number": {"show": True, "label": "Referenznummer", "placeholder": "", "help": ""},
+        "location_info": {"show": True, "label": "Ort / Aufbewahrung", "placeholder": "", "help": ""},
+        "contact_info": {"show": True, "label": "Kontakt / Hotline", "placeholder": "", "help": ""},
+        "details": {"show": True, "label": "Details", "placeholder": "", "help": ""},
+        "notes": {"show": True, "label": "Notizen", "placeholder": "", "help": ""},
+        "is_2fa_enabled": {"show": True, "label": "Zusätzlicher Schutz wie 2FA ist aktiviert", "help": ""},
+    },
+    "table_columns": [
+        {"key": "title", "label": "Titel"},
+        {"key": "provider", "label": "Anbieter"},
+        {"key": "account_username", "label": "Benutzername"},
+    ],
+}
+
+
+def get_category_ui(category_key: str) -> dict[str, Any]:
+    ui = json.loads(json.dumps(DEFAULT_CATEGORY_UI))  # simple deep copy
+    if category_key == "online_accounts":
+        ui["form_intro"] = (
+            "Hinterlegen Sie die Zugänge so, wie Sie sie einem vertrauten Menschen am Küchentisch erklären würden: "
+            "klar, knapp und ohne Interpretationsspielraum."
+        )
+        ui["fields"]["provider"].update({"label": "Anbieter", "placeholder": "z. B. Google, Meta, PayPal"})
+        ui["fields"]["website"].update({"label": "Login-Link", "placeholder": "https://..."})
+        ui["fields"]["account_username"].update({"label": "Benutzername / E-Mail", "placeholder": "z. B. name@example.com"})
+        ui["fields"]["account_password"].update({"label": "Passwort", "placeholder": ""})
+        ui["fields"]["reference_number"].update({"label": "Kundennummer (optional)", "placeholder": ""})
+        ui["fields"]["location_info"].update({"label": "2FA-Info / Wiederherstellung", "placeholder": "z. B. Codes in Passwortmanager / Telefonnummer ..."})
+        ui["fields"]["contact_info"].update({"label": "Support / Hotline (optional)", "placeholder": ""})
+        ui["fields"]["is_2fa_enabled"]["show"] = True
+        ui["table_columns"] = [
+            {"key": "title", "label": "Konto"},
+            {"key": "provider", "label": "Anbieter"},
+            {"key": "account_username", "label": "Benutzername"},
+        ]
+    elif category_key == "devices_media":
+        ui["form_intro"] = (
+            "Hier geht es um Hardware-Zugänge: PC-/Laptop-Logins, PINs, Tür-/Alarmcodes und Datenträger. "
+            "Beschreiben Sie den Ort so, dass er auch ohne Vorwissen gefunden wird."
+        )
+        ui["fields"]["provider"].update({"label": "Gerät / Hersteller (optional)", "placeholder": "z. B. Apple, Lenovo, Bosch"})
+        ui["fields"]["website"]["show"] = False
+        ui["fields"]["account_username"].update({"label": "Benutzerkonto (optional)", "placeholder": "z. B. Windows-Name / macOS-Account"})
+        ui["fields"]["account_password"].update({"label": "PIN / Passwort / Code", "placeholder": ""})
+        ui["fields"]["reference_number"].update({"label": "Seriennummer (optional)", "placeholder": ""})
+        ui["fields"]["location_info"].update({"label": "Ort / Aufbewahrung", "placeholder": "z. B. Schreibtischschublade links, Tresor, Ordner ..." })
+        ui["fields"]["contact_info"]["show"] = False
+        ui["fields"]["is_2fa_enabled"]["show"] = False
+        ui["table_columns"] = [
+            {"key": "title", "label": "Gerät / Zugang"},
+            {"key": "account_username", "label": "Benutzerkonto"},
+            {"key": "location_info", "label": "Ort"},
+        ]
+    elif category_key == "web_domains":
+        ui["form_intro"] = (
+            "Domains und Websites sind oft an Abos, Zahlungsarten und Admin-Zugänge geknüpft. "
+            "Notieren Sie, wo die Verwaltung läuft und wie die Verlängerung geregelt ist."
+        )
+        ui["fields"]["provider"].update({"label": "Registrar / Hoster", "placeholder": "z. B. IONOS, Cloudflare, netcup"})
+        ui["fields"]["website"].update({"label": "Domain / URL", "placeholder": "https://example.de"})
+        ui["fields"]["account_username"].update({"label": "Admin-Login (optional)", "placeholder": "Benutzername / E-Mail"})
+        ui["fields"]["account_password"].update({"label": "Passwort (optional)", "placeholder": ""})
+        ui["fields"]["reference_number"].update({"label": "Kundennummer (optional)", "placeholder": ""})
+        ui["fields"]["location_info"].update({"label": "DNS / Hinweise (optional)", "placeholder": "z. B. Nameserver, DNS-Provider, Zugang Admin-Panel"})
+        ui["fields"]["contact_info"].update({"label": "Support (optional)", "placeholder": ""})
+        ui["fields"]["is_2fa_enabled"]["show"] = True
+        ui["table_columns"] = [
+            {"key": "title", "label": "Website / Projekt"},
+            {"key": "website", "label": "Domain"},
+            {"key": "provider", "label": "Hoster"},
+        ]
+    elif category_key == "contracts":
+        ui["form_intro"] = (
+            "Verträge sind im Ernstfall oft Zeitdruck: Kündigungsfristen, Kunden- oder Vertragsnummern, Ansprechpartner. "
+            "Ein klarer Eintrag spart Rückfragen."
+        )
+        ui["fields"]["provider"].update({"label": "Anbieter", "placeholder": "z. B. Telekom, Netflix, Fitnessstudio"})
+        ui["fields"]["website"].update({"label": "Kundenportal (optional)", "placeholder": "https://..."})
+        ui["fields"]["account_username"].update({"label": "Kundenkonto (optional)", "placeholder": "Benutzername / E-Mail"})
+        ui["fields"]["account_password"].update({"label": "Passwort (optional)", "placeholder": ""})
+        ui["fields"]["reference_number"].update({"label": "Vertragsnummer", "placeholder": ""})
+        ui["fields"]["location_info"].update({"label": "Unterlagen-Ort", "placeholder": "z. B. Ordner 'Verträge', Ablage, Dokument-Upload ..." })
+        ui["fields"]["contact_info"].update({"label": "Kündigungsweg / Kontakt", "placeholder": "z. B. Hotline, E-Mail, Postadresse"})
+        ui["fields"]["is_2fa_enabled"]["show"] = False
+        ui["table_columns"] = [
+            {"key": "title", "label": "Vertrag"},
+            {"key": "provider", "label": "Anbieter"},
+            {"key": "reference_number", "label": "Vertragsnr."},
+        ]
+    elif category_key == "insurances":
+        ui["form_intro"] = (
+            "Versicherungen sind oft entscheidend. Hinterlegen Sie Policen-Nummern, Ansprechpartner und wo die Unterlagen liegen. "
+            "Je konkreter, desto leichter ist es später, Ansprüche zu prüfen."
+        )
+        ui["fields"]["provider"].update({"label": "Versicherer", "placeholder": "z. B. Allianz, HUK, Debeka"})
+        ui["fields"]["website"].update({"label": "Kundenportal (optional)", "placeholder": "https://..."})
+        ui["fields"]["account_username"].update({"label": "Login (optional)", "placeholder": "Benutzername / E-Mail"})
+        ui["fields"]["account_password"].update({"label": "Passwort (optional)", "placeholder": ""})
+        ui["fields"]["reference_number"].update({"label": "Policen-Nr.", "placeholder": ""})
+        ui["fields"]["location_info"].update({"label": "Unterlagen-Ort", "placeholder": "z. B. Ordner 'Versicherungen', Upload ..." })
+        ui["fields"]["contact_info"].update({"label": "Ansprechpartner (optional)", "placeholder": "Makler, Hotline, E-Mail"})
+        ui["fields"]["is_2fa_enabled"]["show"] = False
+        ui["table_columns"] = [
+            {"key": "title", "label": "Versicherung"},
+            {"key": "provider", "label": "Versicherer"},
+            {"key": "reference_number", "label": "Policen-Nr."},
+        ]
+    elif category_key == "documents":
+        ui["form_intro"] = (
+            "Nutzen Sie diesen Bereich für Dokument-Hinweise oder Listen. Die eigentlichen Dateien laden Sie unten hoch."
+        )
+        ui["fields"]["provider"]["show"] = False
+        ui["fields"]["website"]["show"] = False
+        ui["fields"]["account_username"]["show"] = False
+        ui["fields"]["account_password"]["show"] = False
+        ui["fields"]["reference_number"].update({"label": "Dokumenttyp (optional)", "placeholder": "z. B. Vollmacht, Ausweis, Kontoauszug"})
+        ui["fields"]["location_info"].update({"label": "Original liegt hier", "placeholder": "z. B. Ordner im Regal, Tresor ..." })
+        ui["fields"]["contact_info"]["show"] = False
+        ui["fields"]["is_2fa_enabled"]["show"] = False
+        ui["table_columns"] = [
+            {"key": "title", "label": "Hinweis"},
+            {"key": "reference_number", "label": "Typ"},
+            {"key": "location_info", "label": "Original"},
+        ]
+    elif category_key == "important_items":
+        ui["form_intro"] = (
+            "Hier geht es um Orte: Ordner, Schlüssel, Bargeld, Notgroschen, wichtige Mappe. "
+            "Beschreiben Sie es so, dass auch Außenstehende den Ort finden."
+        )
+        ui["fields"]["provider"]["show"] = False
+        ui["fields"]["website"]["show"] = False
+        ui["fields"]["account_username"]["show"] = False
+        ui["fields"]["account_password"]["show"] = False
+        ui["fields"]["reference_number"].update({"label": "Schlüssel / Hinweis (optional)", "placeholder": "z. B. Schlüsselbund blau, Zahlencode ..." })
+        ui["fields"]["location_info"].update({"label": "Ort", "placeholder": "z. B. Schublade, Tresor, Ordner, bei Person ..." })
+        ui["fields"]["contact_info"].update({"label": "Kontakt (optional)", "placeholder": "z. B. Bankberater, Vertrauensperson"})
+        ui["fields"]["is_2fa_enabled"]["show"] = False
+        ui["table_columns"] = [
+            {"key": "title", "label": "Was"},
+            {"key": "location_info", "label": "Ort"},
+            {"key": "reference_number", "label": "Hinweis"},
+        ]
+    elif category_key == "home_network":
+        ui["form_intro"] = (
+            "Smarthome und Heimnetz sind oft schwer zu übernehmen, wenn niemand die Struktur kennt. "
+            "WLAN, Router-Zugänge, Geräte-Listen und wichtige Apps helfen enorm."
+        )
+        ui["fields"]["provider"].update({"label": "System/Hersteller (optional)", "placeholder": "z. B. Fritz!Box, Google Home, Home Assistant"})
+        ui["fields"]["website"]["show"] = False
+        ui["fields"]["account_username"].update({"label": "Admin-Login (optional)", "placeholder": "Benutzername"})
+        ui["fields"]["account_password"].update({"label": "WLAN-/Admin-Passwort (optional)", "placeholder": ""})
+        ui["fields"]["reference_number"].update({"label": "WLAN-Name (SSID) (optional)", "placeholder": ""})
+        ui["fields"]["location_info"].update({"label": "Router/Schlüssel-Ort", "placeholder": "z. B. Flur-Schrank, Keller, Technikraum" })
+        ui["fields"]["contact_info"]["show"] = False
+        ui["fields"]["is_2fa_enabled"]["show"] = False
+        ui["table_columns"] = [
+            {"key": "title", "label": "Bereich"},
+            {"key": "provider", "label": "System"},
+            {"key": "location_info", "label": "Ort"},
+        ]
+    return ui
+
 
 def parse_version(value: str) -> tuple[int, int, int]:
     raw = (value or "").strip().lower()
@@ -2470,6 +2639,7 @@ self.addEventListener('fetch', (event) => {
             documents=documents,
             category_status=get_category_status(profile["id"], category_key),
             provider_links=PROVIDER_LEGACY_LINKS if category_key == "online_accounts" else [],
+            category_ui=get_category_ui(category_key),
         )
 
     @app.route("/digitaler-nachlass/<slug>/<category_key>/status", methods=["POST"])
@@ -2545,6 +2715,7 @@ self.addEventListener('fetch', (event) => {
                     record=None,
                     secret_value=data["account_password"],
                     form_values=data,
+                    category_ui=get_category_ui(category_key),
                 )
             now = utcnow()
             g.db.execute(
@@ -2586,6 +2757,7 @@ self.addEventListener('fetch', (event) => {
             record=None,
             secret_value="",
             form_values=None,
+            category_ui=get_category_ui(category_key),
         )
 
     @app.route("/digitaler-nachlass/<slug>/<category_key>/<int:record_id>/bearbeiten", methods=["GET", "POST"])
@@ -2614,6 +2786,7 @@ self.addEventListener('fetch', (event) => {
                     record=record,
                     secret_value=data["account_password"],
                     form_values=data,
+                    category_ui=get_category_ui(category_key),
                 )
             g.db.execute(
                 """
@@ -2651,6 +2824,7 @@ self.addEventListener('fetch', (event) => {
             record=record,
             secret_value=decrypt_secret(record["secret_encrypted"]),
             form_values=None,
+            category_ui=get_category_ui(category_key),
         )
 
     @app.route("/digitaler-nachlass/<slug>/<category_key>/<int:record_id>/loeschen", methods=["POST"])

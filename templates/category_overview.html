@@ -116,9 +116,16 @@
             <table class="table align-middle">
               <thead class="table-light">
                 <tr>
-                  <th>Titel</th>
-                  <th>Anbieter</th>
-                  <th>Benutzername</th>
+                  {% set cols = (category_ui.table_columns if category_ui else []) %}
+                  {% if cols and cols|length >= 1 %}
+                    {% for col in cols %}
+                      <th>{{ col.label }}</th>
+                    {% endfor %}
+                  {% else %}
+                    <th>Titel</th>
+                    <th>Anbieter</th>
+                    <th>Benutzername</th>
+                  {% endif %}
                   <th>Aktualisiert</th>
                   <th class="text-end">Aktionen</th>
                 </tr>
@@ -126,12 +133,26 @@
               <tbody>
                 {% for record in records %}
                   <tr>
-                    <td>
-                      <div class="fw-semibold">{{ record['title'] }}</div>
-                      <div class="small text-secondary">{{ record['reference_number'] or record['location_info'] or 'Kein Zusatzhinweis' }}</div>
-                    </td>
-                    <td>{{ record['provider'] or '–' }}</td>
-                    <td>{{ record['account_username'] or '–' }}</td>
+                    {% if cols and cols|length >= 1 %}
+                      {% for col in cols %}
+                        {% set value = record[col.key] %}
+                        {% if col.key == 'title' %}
+                          <td>
+                            <div class="fw-semibold">{{ record['title'] }}</div>
+                            <div class="small text-secondary">{{ record['reference_number'] or record['location_info'] or 'Kein Zusatzhinweis' }}</div>
+                          </td>
+                        {% else %}
+                          <td>{{ value or '–' }}</td>
+                        {% endif %}
+                      {% endfor %}
+                    {% else %}
+                      <td>
+                        <div class="fw-semibold">{{ record['title'] }}</div>
+                        <div class="small text-secondary">{{ record['reference_number'] or record['location_info'] or 'Kein Zusatzhinweis' }}</div>
+                      </td>
+                      <td>{{ record['provider'] or '–' }}</td>
+                      <td>{{ record['account_username'] or '–' }}</td>
+                    {% endif %}
                     <td class="small">{{ dt_de(record['updated_at']) }}</td>
                     <td class="text-end">
                       <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reveal_secret', slug=profile['slug'], category_key=category_key, record_id=record['id']) }}">Details</a>
@@ -145,7 +166,8 @@
                     </td>
                   </tr>
                 {% else %}
-                  <tr><td colspan="5" class="text-secondary">Hier ist noch nichts hinterlegt. Wenn du diesen Bereich später brauchst, wird jede früh gepflegte Information hier Zeit und Stress sparen.</td></tr>
+                  {% set colspan_value = ((cols|length) if (cols and cols|length >= 1) else 3) + 2 %}
+                  <tr><td colspan="{{ colspan_value }}" class="text-secondary">Hier ist noch nichts hinterlegt. Wenn du diesen Bereich später brauchst, wird jede früh gepflegte Information hier Zeit und Stress sparen.</td></tr>
                 {% endfor %}
               </tbody>
             </table>

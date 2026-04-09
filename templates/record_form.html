@@ -6,7 +6,7 @@
       <div>
         <p class="section-label mb-2">{{ category_label(category_key) }}</p>
         <h1 class="h3 mb-2">{% if record %}Eintrag bearbeiten{% else %}Neuen Eintrag anlegen{% endif %}</h1>
-        <p class="text-secondary mb-0">Denken Sie dabei nicht nur an Vollständigkeit, sondern an Verständlichkeit. Hinterlegen Sie genau das, was jemand in einer belastenden Situation schnell begreifen und nutzen kann.</p>
+        <p class="text-secondary mb-0">{{ (category_ui.form_intro if category_ui else '') or 'Denken Sie dabei nicht nur an Vollständigkeit, sondern an Verständlichkeit. Hinterlegen Sie genau das, was jemand in einer belastenden Situation schnell begreifen und nutzen kann.' }}</p>
       </div>
       <a class="btn btn-outline-secondary" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category_key) }}">Zurück</a>
     </div>
@@ -17,48 +17,79 @@
         <label class="form-label">Titel</label>
         <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Anbieter / Vertragspartner</label>
-        <input class="form-control" name="provider" maxlength="120" value="{{ values['provider'] if values else '' }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Website / URL</label>
-        <input class="form-control" name="website" inputmode="url" placeholder="https://..." value="{{ values['website'] if values else '' }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Benutzername</label>
-        <input class="form-control" name="account_username" maxlength="120" value="{{ values['account_username'] if values else '' }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Passwort / Geheimnis</label>
-        <input class="form-control" name="account_password" minlength="4" value="{{ secret_value }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Referenznummer</label>
-        <input class="form-control" name="reference_number" maxlength="120" value="{{ values['reference_number'] if values else '' }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Ort / Aufbewahrung</label>
-        <input class="form-control" name="location_info" maxlength="180" value="{{ values['location_info'] if values else '' }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Kontakt / Hotline</label>
-        <input class="form-control" name="contact_info" maxlength="180" value="{{ values['contact_info'] if values else '' }}">
-      </div>
-      <div class="col-12">
-        <label class="form-label">Details</label>
-        <textarea class="form-control" name="details" rows="4" maxlength="4000">{{ values['details'] if values else '' }}</textarea>
-      </div>
-      <div class="col-12">
-        <label class="form-label">Notizen</label>
-        <textarea class="form-control" name="notes" rows="4" maxlength="4000">{{ values['notes'] if values else '' }}</textarea>
-      </div>
-      <div class="col-12">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="is_2fa_enabled" id="is_2fa_enabled" {% if values and values['is_2fa_enabled'] %}checked{% endif %}>
-          <label class="form-check-label" for="is_2fa_enabled">Zusätzlicher Schutz wie 2FA ist aktiviert</label>
+      {% set f = category_ui.fields if category_ui else {} %}
+      {% if not f or (f.provider and f.provider.show) %}
+        <div class="col-md-6">
+          <label class="form-label">{{ (f.provider.label if f and f.provider else 'Anbieter / Vertragspartner') }}</label>
+          <input class="form-control" name="provider" maxlength="120" placeholder="{{ (f.provider.placeholder if f and f.provider else '') }}" value="{{ values['provider'] if values else '' }}">
+          {% if f and f.provider and f.provider.help %}<div class="form-text">{{ f.provider.help }}</div>{% endif %}
         </div>
-      </div>
+      {% endif %}
+      {% if not f or (f.website and f.website.show) %}
+        <div class="col-md-6">
+          <label class="form-label">{{ (f.website.label if f and f.website else 'Website / URL') }}</label>
+          <input class="form-control" name="website" inputmode="url" placeholder="{{ (f.website.placeholder if f and f.website else 'https://...') }}" value="{{ values['website'] if values else '' }}">
+          {% if f and f.website and f.website.help %}<div class="form-text">{{ f.website.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.account_username and f.account_username.show) %}
+        <div class="col-md-6">
+          <label class="form-label">{{ (f.account_username.label if f and f.account_username else 'Benutzername') }}</label>
+          <input class="form-control" name="account_username" maxlength="120" placeholder="{{ (f.account_username.placeholder if f and f.account_username else '') }}" value="{{ values['account_username'] if values else '' }}">
+          {% if f and f.account_username and f.account_username.help %}<div class="form-text">{{ f.account_username.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.account_password and f.account_password.show) %}
+        <div class="col-md-6">
+          <label class="form-label">{{ (f.account_password.label if f and f.account_password else 'Passwort / Geheimnis') }}</label>
+          <input class="form-control" name="account_password" minlength="4" placeholder="{{ (f.account_password.placeholder if f and f.account_password else '') }}" value="{{ secret_value }}">
+          {% if f and f.account_password and f.account_password.help %}<div class="form-text">{{ f.account_password.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.reference_number and f.reference_number.show) %}
+        <div class="col-md-6">
+          <label class="form-label">{{ (f.reference_number.label if f and f.reference_number else 'Referenznummer') }}</label>
+          <input class="form-control" name="reference_number" maxlength="120" placeholder="{{ (f.reference_number.placeholder if f and f.reference_number else '') }}" value="{{ values['reference_number'] if values else '' }}">
+          {% if f and f.reference_number and f.reference_number.help %}<div class="form-text">{{ f.reference_number.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.location_info and f.location_info.show) %}
+        <div class="col-md-6">
+          <label class="form-label">{{ (f.location_info.label if f and f.location_info else 'Ort / Aufbewahrung') }}</label>
+          <input class="form-control" name="location_info" maxlength="180" placeholder="{{ (f.location_info.placeholder if f and f.location_info else '') }}" value="{{ values['location_info'] if values else '' }}">
+          {% if f and f.location_info and f.location_info.help %}<div class="form-text">{{ f.location_info.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.contact_info and f.contact_info.show) %}
+        <div class="col-md-6">
+          <label class="form-label">{{ (f.contact_info.label if f and f.contact_info else 'Kontakt / Hotline') }}</label>
+          <input class="form-control" name="contact_info" maxlength="180" placeholder="{{ (f.contact_info.placeholder if f and f.contact_info else '') }}" value="{{ values['contact_info'] if values else '' }}">
+          {% if f and f.contact_info and f.contact_info.help %}<div class="form-text">{{ f.contact_info.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.details and f.details.show) %}
+        <div class="col-12">
+          <label class="form-label">{{ (f.details.label if f and f.details else 'Details') }}</label>
+          <textarea class="form-control" name="details" rows="4" maxlength="4000" placeholder="{{ (f.details.placeholder if f and f.details else '') }}">{{ values['details'] if values else '' }}</textarea>
+          {% if f and f.details and f.details.help %}<div class="form-text">{{ f.details.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.notes and f.notes.show) %}
+        <div class="col-12">
+          <label class="form-label">{{ (f.notes.label if f and f.notes else 'Notizen') }}</label>
+          <textarea class="form-control" name="notes" rows="4" maxlength="4000" placeholder="{{ (f.notes.placeholder if f and f.notes else '') }}">{{ values['notes'] if values else '' }}</textarea>
+          {% if f and f.notes and f.notes.help %}<div class="form-text">{{ f.notes.help }}</div>{% endif %}
+        </div>
+      {% endif %}
+      {% if not f or (f.is_2fa_enabled and f.is_2fa_enabled.show) %}
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_2fa_enabled" id="is_2fa_enabled" {% if values and values['is_2fa_enabled'] %}checked{% endif %}>
+            <label class="form-check-label" for="is_2fa_enabled">{{ (f.is_2fa_enabled.label if f and f.is_2fa_enabled else 'Zusätzlicher Schutz wie 2FA ist aktiviert') }}</label>
+          </div>
+          {% if f and f.is_2fa_enabled and f.is_2fa_enabled.help %}<div class="form-text">{{ f.is_2fa_enabled.help }}</div>{% endif %}
+        </div>
+      {% endif %}
       <div class="col-12 d-flex gap-2">
         <button class="btn btn-primary">Speichern</button>
         <a class="btn btn-outline-secondary" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category_key) }}">Abbrechen</a>
