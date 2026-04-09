@@ -39,7 +39,7 @@ Slogan: **Alles Wichtige an einem Ort. Für alle Fälle.**
 ## Lokaler Start
 
 ```bash
-cd /Users/michael/Programmerierung/Aeterna
+cd /backuplife
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
