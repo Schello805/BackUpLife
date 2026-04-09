@@ -14,7 +14,7 @@ APP_USER="backuplife"
 ENV_FILE="$APP_DIR/.env"
 
 apt-get update
-apt-get install -y python3 python3-venv python3-pip nginx sqlite3 rsync openssl
+apt-get install -y python3 python3-venv python3-pip nginx sqlite3 rsync openssl iproute2
 
 if [ ! -d "$APP_DIR" ]; then
   echo "BackUpLife ist noch nicht installiert: $APP_DIR fehlt."
@@ -111,7 +111,15 @@ echo "Letzte Logs:"
 journalctl -u backuplife -n 30 --no-pager || true
 echo
 echo "Port 8000 Listener:"
-ss -ltnp 2>/dev/null | grep -E '[:.]8000\\b' || echo "Kein Listener auf Port 8000 gefunden."
+if command -v ss >/dev/null 2>&1; then
+  ss -ltnp | grep -E '[:.]8000\\b' || echo "Kein Listener auf Port 8000 gefunden."
+elif command -v lsof >/dev/null 2>&1; then
+  lsof -nP -iTCP:8000 -sTCP:LISTEN || echo "Kein Listener auf Port 8000 gefunden."
+elif command -v netstat >/dev/null 2>&1; then
+  netstat -ltnp 2>/dev/null | grep -E '[:.]8000\\b' || echo "Kein Listener auf Port 8000 gefunden."
+else
+  echo "Port-Check nicht möglich (ss/lsof/netstat fehlt)."
+fi
 echo
 echo "Hinweis: Wenn du per CLI starten willst, stoppe vorher den Service oder nutze einen anderen Port:"
 echo "  systemctl stop backuplife"
