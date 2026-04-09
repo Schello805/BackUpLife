@@ -112,11 +112,11 @@ journalctl -u backuplife -n 30 --no-pager || true
 echo
 echo "Port 8000 Listener:"
 if command -v ss >/dev/null 2>&1; then
-  ss -ltnp | grep -E '[:.]8000\\b' || echo "Kein Listener auf Port 8000 gefunden."
+  ss -ltnp | grep -E '(:|\\.)8000($|[^0-9])' || echo "Kein Listener auf Port 8000 gefunden."
 elif command -v lsof >/dev/null 2>&1; then
   lsof -nP -iTCP:8000 -sTCP:LISTEN || echo "Kein Listener auf Port 8000 gefunden."
 elif command -v netstat >/dev/null 2>&1; then
-  netstat -ltnp 2>/dev/null | grep -E '[:.]8000\\b' || echo "Kein Listener auf Port 8000 gefunden."
+  netstat -ltnp 2>/dev/null | grep -E '(:|\\.)8000($|[^0-9])' || echo "Kein Listener auf Port 8000 gefunden."
 else
   echo "Port-Check nicht möglich (ss/lsof/netstat fehlt)."
 fi
