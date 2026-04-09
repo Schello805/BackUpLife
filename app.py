@@ -2503,6 +2503,7 @@ self.addEventListener('fetch', (event) => {
     @app.route("/konto", methods=["GET", "POST"])
     @login_required
     def account_settings():
+        twofa_redirect = url_for("account_settings", _anchor="twofa")
         if request.method == "POST":
             form_id = (request.form.get("form_id") or "").strip()
             if form_id == "email":
@@ -2546,10 +2547,10 @@ self.addEventListener('fetch', (event) => {
                 password = request.form.get("password", "")
                 if not verify_password(password, g.user["password_hash"]):
                     push_toast("Das Passwort ist nicht korrekt.", "danger", "2FA nicht gestartet")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 if g.user["totp_enabled"]:
                     push_toast("2FA ist bereits aktiv.", "info", "2FA")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 secret = generate_totp_secret()
                 g.db.execute(
                     """
@@ -2563,16 +2564,16 @@ self.addEventListener('fetch', (event) => {
                 g.db.commit()
                 log_event("totp_begin", "account", "2FA Einrichtung gestartet", user_id=g.user["id"])
                 push_toast("2FA wurde vorbereitet. Bitte scannen Sie den QR-Code und bestätigen Sie den Code.", "success", "2FA starten")
-                return redirect(url_for("account_settings"))
+                return redirect(twofa_redirect)
             if form_id == "totp_confirm":
                 if g.user["totp_enabled"]:
                     push_toast("2FA ist bereits aktiv.", "info", "2FA")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 secret = decrypt_secret(g.user["totp_secret_encrypted"])
                 code = request.form.get("code", "")
                 if not secret or not verify_totp(secret, code):
                     push_toast("Der Code ist nicht korrekt. Bitte versuchen Sie es erneut.", "danger", "2FA nicht aktiviert")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 codes = generate_backup_codes(10)
                 g.db.execute(
                     """
@@ -2586,16 +2587,16 @@ self.addEventListener('fetch', (event) => {
                 session["totp_new_backup_codes"] = codes
                 log_event("totp_enabled", "account", "2FA aktiviert", user_id=g.user["id"])
                 push_toast("2FA wurde aktiviert. Bitte sichern Sie Ihre Backup-Codes an einem sicheren Ort.", "success", "2FA aktiv")
-                return redirect(url_for("account_settings"))
+                return redirect(twofa_redirect)
             if form_id == "totp_disable":
                 password = request.form.get("password", "")
                 code = request.form.get("code", "")
                 if not verify_password(password, g.user["password_hash"]):
                     push_toast("Das Passwort ist nicht korrekt.", "danger", "2FA nicht deaktiviert")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 if not g.user["totp_enabled"]:
                     push_toast("2FA ist aktuell nicht aktiv.", "info", "2FA")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 secret = decrypt_secret(g.user["totp_secret_encrypted"])
                 ok = bool(secret and verify_totp(secret, code))
                 if not ok:
@@ -2604,7 +2605,7 @@ self.addEventListener('fetch', (event) => {
                     ok = backup_norm in backup_list
                 if not ok:
                     push_toast("Der Code ist nicht korrekt. 2FA bleibt aktiv.", "danger", "2FA nicht deaktiviert")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 g.db.execute(
                     """
                     UPDATE users
@@ -2617,16 +2618,16 @@ self.addEventListener('fetch', (event) => {
                 g.db.commit()
                 log_event("totp_disabled", "account", "2FA deaktiviert", user_id=g.user["id"])
                 push_toast("2FA wurde deaktiviert.", "success", "2FA deaktiviert")
-                return redirect(url_for("account_settings"))
+                return redirect(twofa_redirect)
             if form_id == "totp_regen_backup":
                 password = request.form.get("password", "")
                 code = request.form.get("code", "")
                 if not verify_password(password, g.user["password_hash"]):
                     push_toast("Das Passwort ist nicht korrekt.", "danger", "Backup-Codes nicht erneuert")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 if not g.user["totp_enabled"]:
                     push_toast("2FA ist aktuell nicht aktiv.", "info", "2FA")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 secret = decrypt_secret(g.user["totp_secret_encrypted"])
                 ok = bool(secret and verify_totp(secret, code))
                 if not ok:
@@ -2635,7 +2636,7 @@ self.addEventListener('fetch', (event) => {
                     ok = backup_norm in backup_list
                 if not ok:
                     push_toast("Der Code ist nicht korrekt.", "danger", "Backup-Codes nicht erneuert")
-                    return redirect(url_for("account_settings"))
+                    return redirect(twofa_redirect)
                 codes = generate_backup_codes(10)
                 g.db.execute(
                     "UPDATE users SET totp_backup_codes_encrypted = ?, updated_at = ? WHERE id = ?",
@@ -2645,7 +2646,7 @@ self.addEventListener('fetch', (event) => {
                 session["totp_new_backup_codes"] = codes
                 log_event("totp_backup_regen", "account", "Backup-Codes erneuert", user_id=g.user["id"])
                 push_toast("Neue Backup-Codes wurden erstellt. Bitte sichern Sie sie erneut.", "success", "Backup-Codes erneuert")
-                return redirect(url_for("account_settings"))
+                return redirect(twofa_redirect)
             push_toast("Unbekannte Aktion.", "warning", "Konto")
             return redirect(url_for("account_settings"))
 
