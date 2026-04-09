@@ -22,10 +22,22 @@
                 <select class="form-select" id="onlinePreset">
                   <option value="">Bitte wählen…</option>
                   <option value="email">E-Mail</option>
+                  <option value="google">Google</option>
+                  <option value="microsoft">Microsoft</option>
+                  <option value="apple">Apple ID</option>
                   <option value="smartphone">Smartphone (PIN/Passwort)</option>
                   <option value="onlinebanking">Onlinebanking</option>
+                  <option value="paypal">PayPal</option>
                   <option value="amazon">Amazon</option>
                   <option value="ebay">eBay</option>
+                  <option value="meta">Facebook / Meta</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="x">X (Twitter)</option>
+                  <option value="netflix">Netflix</option>
+                  <option value="spotify">Spotify</option>
+                  <option value="dropbox">Dropbox</option>
                   <option value="other">Anderes…</option>
                 </select>
                 <div class="form-text">Damit sind die wichtigsten Zugänge schnell angelegt. Sie können alles danach frei anpassen.</div>
@@ -135,10 +147,22 @@
 
         const map = {
           email: { title: 'E-Mail', url: 'https://mail.google.com/' },
+          google: { title: 'Google', url: 'https://accounts.google.com/signin' },
+          microsoft: { title: 'Microsoft', url: 'https://login.live.com/' },
+          apple: { title: 'Apple ID', url: 'https://appleid.apple.com/' },
           smartphone: { title: 'Smartphone (PIN/Passwort)', url: '' },
           onlinebanking: { title: 'Onlinebanking', url: '' },
+          paypal: { title: 'PayPal', url: 'https://www.paypal.com/signin' },
           amazon: { title: 'Amazon', url: 'https://www.amazon.de/ap/signin' },
           ebay: { title: 'eBay', url: 'https://signin.ebay.de/' },
+          meta: { title: 'Facebook / Meta', url: 'https://www.facebook.com/login/' },
+          instagram: { title: 'Instagram', url: 'https://www.instagram.com/accounts/login/' },
+          whatsapp: { title: 'WhatsApp', url: 'https://web.whatsapp.com/' },
+          linkedin: { title: 'LinkedIn', url: 'https://www.linkedin.com/login' },
+          x: { title: 'X (Twitter)', url: 'https://x.com/i/flow/login' },
+          netflix: { title: 'Netflix', url: 'https://www.netflix.com/login' },
+          spotify: { title: 'Spotify', url: 'https://accounts.spotify.com/' },
+          dropbox: { title: 'Dropbox', url: 'https://www.dropbox.com/login' },
           other: { title: '' , url: '' },
         };
 
