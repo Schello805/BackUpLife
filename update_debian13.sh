@@ -12,6 +12,8 @@ NGINX_FILE="/etc/nginx/sites-available/backuplife"
 DOMAIN="${1:-_}"
 APP_USER="backuplife"
 ENV_FILE="$APP_DIR/.env"
+BUILD_SHA="$(git rev-parse --short HEAD 2>/dev/null || true)"
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 apt-get update
 apt-get install -y python3 python3-venv python3-pip nginx sqlite3 rsync openssl iproute2
@@ -73,6 +75,20 @@ BACKUPLIFE_TRUST_PROXY=1
 EOF
     chown "$APP_USER":"$APP_USER" "$ENV_FILE"
     chmod 600 "$ENV_FILE"
+  fi
+fi
+
+# Always refresh build info on update runs.
+if [ -n "${BUILD_SHA:-}" ]; then
+  if grep -q '^BACKUPLIFE_BUILD_SHA=' "$ENV_FILE"; then
+    sed -i "s/^BACKUPLIFE_BUILD_SHA=.*/BACKUPLIFE_BUILD_SHA=$BUILD_SHA/" "$ENV_FILE"
+  else
+    echo "BACKUPLIFE_BUILD_SHA=$BUILD_SHA" >> "$ENV_FILE"
+  fi
+  if grep -q '^BACKUPLIFE_BUILD_DATE=' "$ENV_FILE"; then
+    sed -i "s/^BACKUPLIFE_BUILD_DATE=.*/BACKUPLIFE_BUILD_DATE=$BUILD_DATE/" "$ENV_FILE"
+  else
+    echo "BACKUPLIFE_BUILD_DATE=$BUILD_DATE" >> "$ENV_FILE"
   fi
 fi
 

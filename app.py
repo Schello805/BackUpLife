@@ -56,6 +56,8 @@ GITHUB_REPO = "Schello805/BackUpLife"
 GITHUB_PROJECT_URL = "https://github.com/Schello805/BackUpLife"
 UPDATE_CHECK_TTL_SECONDS = 6 * 60 * 60
 _UPDATE_CACHE: dict[str, Any] = {"checked_at": 0, "status": "unknown", "latest": ""}
+BUILD_SHA = os.environ.get("BACKUPLIFE_BUILD_SHA", "").strip()
+BUILD_DATE = os.environ.get("BACKUPLIFE_BUILD_DATE", "").strip()
 DEFAULT_PROFILE_STORAGE_MB = 100
 DEFAULT_REQUIRE_EMAIL_VERIFICATION = 1
 DEFAULT_ALLOW_REGISTRATION = 1
@@ -331,6 +333,14 @@ def get_update_info() -> dict[str, Any]:
         status = "update_available" if is_version_newer(latest, APP_VERSION) else "up_to_date"
     _UPDATE_CACHE.update({"checked_at": now, "status": status, "latest": latest})
     return dict(_UPDATE_CACHE)
+
+
+def get_build_info() -> dict[str, Any]:
+    return {
+        "version": APP_VERSION,
+        "build_sha": BUILD_SHA,
+        "build_date": BUILD_DATE,
+    }
 
 HELP_PAGE_LINKS = [
     {
@@ -1898,6 +1908,18 @@ self.addEventListener('fetch', (event) => {
 """
         return Response(js, mimetype="application/javascript; charset=utf-8")
 
+    @app.route("/version")
+    def version_info():
+        info = get_build_info()
+        info.update(
+            {
+                "app": "BackUpLife",
+                "pid": os.getpid(),
+                "python": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+            }
+        )
+        return Response(json.dumps(info, ensure_ascii=False), mimetype="application/json; charset=utf-8")
+
     # Compatibility routes: browsers or old bookmarks may request these directly.
     @app.route("/logo.png")
     def logo_png():
@@ -3435,6 +3457,7 @@ self.addEventListener('fetch', (event) => {
             "app_version": APP_VERSION,
             "update_info": get_update_info(),
             "github_project_url": GITHUB_PROJECT_URL,
+            "build_info": get_build_info(),
         }
 
     @app.errorhandler(403)

@@ -7,6 +7,8 @@ NGINX_FILE="/etc/nginx/sites-available/backuplife"
 DOMAIN="${1:-_}"
 APP_USER="backuplife"
 ENV_FILE="$APP_DIR/.env"
+BUILD_SHA="$(git rev-parse --short HEAD 2>/dev/null || true)"
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 apt-get update
 apt-get install -y python3 python3-venv python3-pip nginx sqlite3 rsync openssl iproute2
@@ -42,6 +44,8 @@ FLASK_SECRET_KEY=$FLASK_SECRET_KEY
 BACKUPLIFE_APP_KEY=$BACKUPLIFE_APP_KEY
 BACKUPLIFE_DB_PATH=$APP_DIR/instance/backuplife.db
 BACKUPLIFE_UPLOAD_DIR=$APP_DIR/instance/uploads
+BACKUPLIFE_BUILD_SHA=$BUILD_SHA
+BACKUPLIFE_BUILD_DATE=$BUILD_DATE
 
 # If you run behind Nginx (recommended), trust forwarded headers.
 BACKUPLIFE_TRUST_PROXY=1
@@ -62,12 +66,27 @@ FLASK_SECRET_KEY=$FLASK_SECRET_KEY
 BACKUPLIFE_APP_KEY=$BACKUPLIFE_APP_KEY
 BACKUPLIFE_DB_PATH=$APP_DIR/instance/backuplife.db
 BACKUPLIFE_UPLOAD_DIR=$APP_DIR/instance/uploads
+BACKUPLIFE_BUILD_SHA=$BUILD_SHA
+BACKUPLIFE_BUILD_DATE=$BUILD_DATE
 
 BACKUPLIFE_TRUST_PROXY=1
 # BACKUPLIFE_COOKIE_SECURE=1
 EOF
     chown "$APP_USER":"$APP_USER" "$ENV_FILE"
     chmod 600 "$ENV_FILE"
+  fi
+  # Always refresh build info on install runs.
+  if [ -n "${BUILD_SHA:-}" ]; then
+    if grep -q '^BACKUPLIFE_BUILD_SHA=' "$ENV_FILE"; then
+      sed -i "s/^BACKUPLIFE_BUILD_SHA=.*/BACKUPLIFE_BUILD_SHA=$BUILD_SHA/" "$ENV_FILE"
+    else
+      echo "BACKUPLIFE_BUILD_SHA=$BUILD_SHA" >> "$ENV_FILE"
+    fi
+    if grep -q '^BACKUPLIFE_BUILD_DATE=' "$ENV_FILE"; then
+      sed -i "s/^BACKUPLIFE_BUILD_DATE=.*/BACKUPLIFE_BUILD_DATE=$BUILD_DATE/" "$ENV_FILE"
+    else
+      echo "BACKUPLIFE_BUILD_DATE=$BUILD_DATE" >> "$ENV_FILE"
+    fi
   fi
 fi
 
