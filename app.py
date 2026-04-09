@@ -314,15 +314,34 @@ def fetch_latest_github_version(timeout_seconds: float = 1.2) -> str:
     return ""
 
 
+def fetch_latest_github_main_sha(timeout_seconds: float = 1.2) -> str:
+    # Fallback when no releases/tags exist: compare build SHA to latest main commit.
+    headers = {"User-Agent": f"BackUpLife/{APP_VERSION}", "Accept": "application/vnd.github+json"}
+    try:
+        req = Request(
+            f"https://api.github.com/repos/{GITHUB_REPO}/commits/main",
+            headers=headers,
+        )
+        with urlopen(req, timeout=timeout_seconds) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if isinstance(data, dict) and data.get("sha"):
+            return str(data["sha"])
+    except (URLError, HTTPError, ValueError, TimeoutError):
+        return ""
+    except Exception:
+        return ""
+    return ""
+
+
 def get_update_info() -> dict[str, Any]:
     # Avoid network in tests or when explicitly disabled.
     try:
         if current_app.testing:
-            return {"status": "disabled", "latest": "", "checked_at": None}
+            return {"status": "disabled", "latest": "", "kind": "", "checked_at": None}
     except Exception:
         pass
     if os.environ.get("BACKUPLIFE_DISABLE_UPDATE_CHECK") == "1":
-        return {"status": "disabled", "latest": "", "checked_at": None}
+        return {"status": "disabled", "latest": "", "kind": "", "checked_at": None}
 
     now = int(time.time())
     if int(_UPDATE_CACHE.get("checked_at") or 0) and now - int(_UPDATE_CACHE.get("checked_at") or 0) < UPDATE_CHECK_TTL_SECONDS:
@@ -330,9 +349,17 @@ def get_update_info() -> dict[str, Any]:
 
     latest = fetch_latest_github_version()
     status = "unknown"
+    kind = ""
     if latest:
+        kind = "version"
         status = "update_available" if is_version_newer(latest, APP_VERSION) else "up_to_date"
-    _UPDATE_CACHE.update({"checked_at": now, "status": status, "latest": latest})
+    else:
+        latest_sha = fetch_latest_github_main_sha()
+        if latest_sha:
+            kind = "commit"
+            latest = latest_sha[:7]
+            status = "update_available" if (BUILD_SHA and latest != (BUILD_SHA or "")[:7]) else "up_to_date"
+    _UPDATE_CACHE.update({"checked_at": now, "status": status, "latest": latest, "kind": kind})
     return dict(_UPDATE_CACHE)
 
 
