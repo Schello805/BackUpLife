@@ -1,19 +1,27 @@
 {% extends "layout.html" %}
 {% block title %}Letzte Wünsche{% endblock %}
 {% block content %}
-  <div class="page-shell p-4 p-lg-5">
-    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
-      <div class="flex-grow-1">
-        <p class="section-label mb-2">Letzte Wünsche</p>
-        <h1 class="h3 mb-2">{{ profile['title'] }}</h1>
-        <p class="text-secondary mb-0">Hier ist Raum für alles, was sich nicht rein organisatorisch erklären lässt: persönliche Worte, Wünsche, Hinweise und Dinge, die Menschen später mit Herz und nicht nur mit Formularen verstehen sollen.</p>
-      </div>
+	  <div class="page-shell p-4 p-lg-5">
+	    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+	      <div class="flex-grow-1">
+	        <p class="section-label mb-2">Letzte Wünsche</p>
+	        <h1 class="h3 mb-2">{{ profile['title'] }}</h1>
+	        <p class="text-secondary mb-0">Hier ist Raum für alles, was sich nicht rein organisatorisch erklären lässt: persönliche Worte, Wünsche, Hinweise und Dinge, die Menschen später mit Herz und nicht nur mit Formularen verstehen sollen.</p>
+	      </div>
       <div class="d-flex flex-wrap justify-content-lg-end gap-2">
         <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('profile_dashboard', slug=profile['slug']) }}">Zurück zum Nachlass</a>
         <a class="btn btn-primary btn-sm" href="{{ url_for('export_profile', slug=profile['slug']) }}" target="_blank" rel="noreferrer">Druckansicht</a>
       </div>
-    </div>
-    <form method="post" class="row g-4" novalidate>
+	    </div>
+	    <div class="subtle-card p-3 mb-4">
+	      <div class="fw-semibold mb-1">Wichtiger Hinweis</div>
+	      <div class="small text-secondary">
+	        Aeterna ersetzt kein Testament und ist keine rechtlich verbindliche Verfügung. Die Inhalte hier sind persönliche Worte, Gedanken, Wünsche und praktische Orientierung für Hinterbliebene.
+	        Ob und wie diese Wünsche umgesetzt werden, liegt am Ende bei den Angehörigen und den rechtlich vorgesehenen Regelungen.
+	        Wenn Sie rechtsverbindlich vorsorgen möchten (z. B. Testament, Vollmacht), nutzen Sie bitte die dafür vorgesehenen Wege und legen Sie Unterlagen im Bereich „Dokumente“ ab.
+	      </div>
+	    </div>
+	    <form method="post" class="row g-4" novalidate>
       <div class="col-lg-6">
         <label class="form-label">Persönliche Nachricht</label>
         <textarea class="form-control" name="farewell_message" rows="8" maxlength="4000" placeholder="Zum Beispiel: Persönliche Worte an die Familie, Dank, letzte Nachricht oder Hinweise, die Ihnen besonders wichtig sind." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['farewell_message'] }}</textarea>
