@@ -19,7 +19,7 @@ def test_setup_page_reachable(client):
 
 
 def test_legal_help_pages_reachable_after_init(logged_in_admin):
-    for path in ["/hilfe", "/impressum", "/datenschutz", "/cookies", "/robots.txt", "/sitemap.xml"]:
+    for path in ["/hilfe", "/impressum", "/datenschutz", "/cookies", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/sw.js"]:
         resp = logged_in_admin.get(path)
         assert resp.status_code == 200
 

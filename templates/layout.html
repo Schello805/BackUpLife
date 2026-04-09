@@ -9,6 +9,11 @@
     <meta name="robots" content="{% block meta_robots %}noindex, nofollow{% endblock %}">
     <link rel="canonical" href="{% block canonical_url %}{{ public_base }}{{ request.path }}{% endblock %}">
     <meta name="theme-color" content="#103654">
+    <meta name="application-name" content="BackUpLife">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="{{ url_for('manifest_webmanifest') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('logo_asset') }}">
 
     <meta property="og:site_name" content="BackUpLife">
     <meta property="og:title" content="{% block og_title %}{{ self.title()|striptags|trim }}{% endblock %}">
@@ -176,6 +181,14 @@
           banner.hidden = false;
           ok.addEventListener('click', () => { banner.hidden = true; });
         }
+      })();
+
+      (function () {
+        if (!('serviceWorker' in navigator)) return;
+        const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        const isHttps = location.protocol === 'https:';
+        if (!isHttps && !isLocalhost) return;
+        navigator.serviceWorker.register('{{ url_for('service_worker') }}').catch(() => {});
       })();
     </script>
   </body>

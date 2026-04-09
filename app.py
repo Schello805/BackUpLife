@@ -433,6 +433,8 @@ def create_app() -> Flask:
             "setup",
             "static",
             "logo_asset",
+            "manifest_webmanifest",
+            "service_worker",
             "profile_hint",
             "profile_emergency",
             "imprint",
@@ -1502,6 +1504,50 @@ def register_routes(app: Flask) -> None:
     @app.route("/branding/logo.png")
     def logo_asset():
         return send_from_directory(BASE_DIR, "Logo.png")
+
+    @app.route("/manifest.webmanifest")
+    def manifest_webmanifest():
+        base = (g.public_base_url or request.url_root.rstrip("/")).rstrip("/")
+        payload = {
+            "name": "BackUpLife",
+            "short_name": "BackUpLife",
+            "start_url": f"{base}/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#fbfcfe",
+            "theme_color": "#103654",
+            "icons": [
+                {
+                    "src": f"{base}{url_for('logo_asset')}",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                },
+                {
+                    "src": f"{base}{url_for('logo_asset')}",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                },
+            ],
+        }
+        return Response(json.dumps(payload, ensure_ascii=False), mimetype="application/manifest+json; charset=utf-8")
+
+    @app.route("/sw.js")
+    def service_worker():
+        # Minimal SW: required by some platforms for install prompts; no offline caching by default.
+        js = """\
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  // pass-through
+});
+"""
+        return Response(js, mimetype="application/javascript; charset=utf-8")
 
     # Compatibility routes: browsers or old bookmarks may request these directly.
     @app.route("/logo.png")
