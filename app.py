@@ -623,8 +623,6 @@ def validate_smtp_form(form: Any) -> list[str]:
         errors.append("Bitte geben Sie eine gültige Absender-E-Mail an.")
     if test_recipient and not is_valid_email(test_recipient):
         errors.append("Bitte geben Sie eine gültige Test-E-Mail an.")
-    if form.get("send_test_mail") and not test_recipient:
-        errors.append("Bitte geben Sie eine Empfängeradresse für die Testmail an.")
     if (form.get("username") or form.get("smtp_password") or sender_email) and not host:
         errors.append("Bitte hinterlegen Sie einen SMTP-Host.")
     return errors
