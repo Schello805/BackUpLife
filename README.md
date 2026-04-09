@@ -2,8 +2,6 @@
 
 Aeterna ist eine seriöse, deutschsprachige WebApp zur Verwaltung eines digitalen Nachlasses für Familien. Die Anwendung trennt Admin, Ersteller und Leser sauber, bietet persönliche Nachlass-URLs pro Ersteller, echte Freigaben bis auf Kategorie-Ebene, verschlüsselte Speicherung sensibler Zugangsdaten, Audit-Logs und Druckexporte.
 
-![Aeterna Logo](./Logo_aeterna.png)
-
 ## Funktionsumfang
 
 - Passwort-Login für `Admin`, `Ersteller` und `Leser`
