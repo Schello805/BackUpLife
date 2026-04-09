@@ -1,76 +1,100 @@
 # BackUpLife
 
-BackUpLife ist eine seriöse, deutschsprachige WebApp, um wichtige Informationen für alle Fälle geordnet zu hinterlassen. Die Anwendung trennt Admin, Ersteller und Leser sauber, bietet persönliche URLs pro Ersteller, Freigaben bis auf Kategorie-Ebene, verschlüsselte Speicherung sensibler Zugangsdaten, Audit-Logs und Druckexporte.
+BackUpLife ist eine kostenlose, deutschsprachige **WebApp (Nachlass App)** für **digitalen Nachlass**: Zugangsdaten, Unterlagen, Geräte, Verträge und persönliche Worte so hinterlassen, dass Angehörige im Notfall schneller Orientierung finden. Die App ist für den Selbstbetrieb gedacht (z. B. lokal, im Heimnetz oder auf einem Debian‑Server hinter Reverse Proxy).
 
 Slogan: **Alles Wichtige an einem Ort. Für alle Fälle.**
 
-## Funktionsumfang
+Wichtig: BackUpLife ersetzt kein Testament und ist keine rechtlich verbindliche Verfügung. Es ist eine strukturierte Möglichkeit, Gedanken, Wünsche und praktische Informationen zu hinterlassen.
 
-- Passwort-Login für `Admin`, `Ersteller` und `Leser`
-- Ersteinrichtung ohne Demo- oder Testdaten
-- Eigene Notfall-URL pro Ersteller über `/notfall/<slug>` (für Geldbörse/Notfallmappe)
-- Navigation mit nur vier Hauptpunkten:
-  - `Dashboard`
-  - `Digitaler Nachlass`
-  - `Letzte Wünsche`
-  - `Verwaltung`
-- Kategorien im digitalen Nachlass:
-  - Onlinekonten
-  - Verträge
-  - Versicherungen
-  - Unterlagen & Notgroschen
-  - Heimnetz & Smarthome
-  - Dokumente
-- Freigaben für den gesamten Nachlass oder nur für einzelne Kategorien
-- Dokumentenupload
-- E-Mail-Verifikation (Bestätigung vor Login, für öffentliche Instanzen empfohlen)
-- Passwort-Reset über SMTP
-- Druckansicht / Export
-- Audit-Logs mit Zeit, Benutzer, Aktion, Pfad und IP
-- Toasts für Erfolg, Warnungen und Fehler
-  - Verschlüsseltes Backup (`.zip.enc`) im Adminbereich
+## Features
 
-## Stack
+- Rollenmodell mit klarer Trennung:
+  - **Admin**: genau **ein** Admin (immer der erste Benutzer), verwaltet System/SMTP/Sicherheit
+  - **Ersteller**: pflegt den eigenen Nachlass (eigene URL)
+  - **Leser**: sieht nur explizit freigegebene Inhalte
+- Persönliche Notfall‑URL je Ersteller: `/notfall/<slug>`
+- Druckbare **Notfallkarte** (Scheckkartengröße): `/notfall/<slug>/karte`
+- Freigaben: gesamter Nachlass oder pro Kategorie
+- Kategorie‑Übersicht mit Karten, reduzierte Navigation (4 Hauptpunkte): Dashboard, Digitaler Nachlass, Letzte Wünsche, Verwaltung
+- Onlinekonten mit Presets (E‑Mail, Google, Microsoft, Apple, Amazon, eBay, PayPal, Passwortmanager, …)
+- Dokumente/Uploads je Kategorie (Quota pro Nachlass, Standard: **100 MB nur für Dokumente/Uploads**)
+- E‑Mail‑Verifikation (optional, empfohlen für öffentlich erreichbare Instanzen)
+- Passwort‑Reset via SMTP
+- Druckexport (neuer Tab)
+- Audit‑Logs (Zeit, Benutzer, Aktion, IP, Pfad)
+- Security:
+  - CSRF‑Schutz für Formulare
+  - Rate‑Limit und **gestaffelter Login‑Lockout** (5/10/15 Fehlversuche)
+  - **TOTP‑2FA** (optional) und **Admin‑2FA Pflicht** (Default)
+- Admin‑Backup‑Download als **verschlüsseltes** Archiv (`.zip.enc`)
+- Debug/Verifikation: `/version` zeigt Version/Build‑SHA/Build‑Datum
 
-- `Flask`
+## Kategorien (Digitaler Nachlass)
+
+- Onlinekonten
+- Geräte & Datenträger
+- Websites & Domains
+- Verträge
+- Versicherungen
+- Dokumente
+- Unterlagen & Notgroschen
+- Heimnetz & Smarthome
+
+## Tech‑Stack
+
+- Python `Flask`
 - `SQLite`
 - `Bootstrap 5`
-- `cryptography` für die Verschlüsselung sensibler Fremd-Passwörter
-- `gunicorn` für Debian-Deployment
+- `cryptography` (Verschlüsselung gespeicherter Zugangsdaten)
+- `gunicorn` + `nginx` (Deployment)
 
-## Lokaler Start
+## Lokaler Start (CLI)
 
 ```bash
-	cd /backuplife
-	python3 -m venv .venv
-	source .venv/bin/activate
-	pip install -r requirements.txt
-	./scripts/init_env.sh
-	python3 app.py
-	```
+cd BackUpLife
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+./scripts/init_env.sh
+python3 app.py
+```
 
-Danach ist die App unter [http://127.0.0.1:8000](http://127.0.0.1:8000) erreichbar.
+Danach: `http://127.0.0.1:8000` (beim ersten Aufruf kommt die Ersteinrichtung; keine Demo‑User/Testdaten).
 
-Beim ersten Aufruf erscheint automatisch die Ersteinrichtung. Es werden keine Demo-Benutzer angelegt.
+## Debian 13 / Proxmox LXC (Systemd + Nginx)
 
-## Validierung und Sicherheit
+```bash
+sudo bash install_debian13.sh
+```
 
-- Benutzerpasswörter werden gehasht gespeichert
-- hinterlegte Zugangsdaten für Fremdkonten werden verschlüsselt gespeichert
-- Dateiuploads sind auf erlaubte Formate und 20 MB begrenzt
-- Upload-Speicher ist pro Nachlass konfigurierbar (Standard: 100 MB)
-- CSRF-Schutz für alle Formulare
-- Rate-Limiting für Login/Registrierung/Passwort-Reset
-- Formulare prüfen zentrale Eingaben serverseitig
-- jede wichtige Aktion erzeugt einen Audit-Log-Eintrag
+Das Skript installiert Abhängigkeiten, deployed nach `/opt/backuplife`, erzeugt eine sichere `/opt/backuplife/.env` (inkl. zufälliger Keys) und startet den Systemd‑Service.
 
-## Umgebungsvariablen (Auszug)
+### Update (Debian 13)
 
-- `BACKUPLIFE_APP_KEY`: App-Key für Verschlüsselung (fallback: `AETERNA_APP_KEY`)
-- `BACKUPLIFE_DB_PATH`: DB-Pfad (fallback: `AETERNA_DB_PATH`)
-- `BACKUPLIFE_UPLOAD_DIR`: Upload-Verzeichnis (fallback: `AETERNA_UPLOAD_DIR`)
-- `BACKUPLIFE_TRUST_PROXY=1`: X-Forwarded-* Header vertrauen (Reverse Proxy)
-- `BACKUPLIFE_COOKIE_SECURE=1`: Secure-Cookies erzwingen (für HTTPS-Betrieb)
+```bash
+git pull --ff-only
+sudo bash update_debian13.sh
+```
+
+Das Update überschreibt **nicht** `instance/` und startet den Service neu. Build‑Infos werden in der `.env` aktualisiert, damit du über `/version` sicher siehst, welcher Stand läuft.
+
+## Sicherheit (Passwörter & Keys)
+
+- Benutzerpasswörter: sicher gehasht gespeichert (kein Klartext).
+- Hinterlegte Zugangsdaten: **verschlüsselt** gespeichert (Key: `BACKUPLIFE_APP_KEY`).
+- Wichtig: Schütze die `.env` (enthält `BACKUPLIFE_APP_KEY`) und sichere sie separat. Wenn der Key verloren geht, sind gespeicherte Geheimnisse nicht mehr entschlüsselbar.
+- Uploads: Dateityp‑Whitelist, max. 20 MB pro Datei; Speicherlimit pro Nachlass (Standard 100 MB, gilt nur für Dokumente/Uploads).
+
+## Wichtige Umgebungsvariablen (Auszug)
+
+- `FLASK_SECRET_KEY`
+- `BACKUPLIFE_APP_KEY` (Fallback: `AETERNA_APP_KEY`)
+- `BACKUPLIFE_DB_PATH` (Fallback: `AETERNA_DB_PATH`)
+- `BACKUPLIFE_UPLOAD_DIR` (Fallback: `AETERNA_UPLOAD_DIR`)
+- `BACKUPLIFE_TRUST_PROXY=1` (Reverse‑Proxy Header vertrauen)
+- `BACKUPLIFE_COOKIE_SECURE=1` (Secure Cookies für HTTPS)
+- `BACKUPLIFE_SESSION_LIFETIME_MINUTES=120`
+- `BACKUPLIFE_ENFORCE_ADMIN_2FA=1`
 
 ## Tests
 
@@ -79,28 +103,13 @@ source .venv/bin/activate
 pytest
 ```
 
-Die Test-Suite nutzt eine temporäre Datenbank und hinterlässt keine Testdaten im Projekt.
+Die Test‑Suite nutzt eine temporäre DB und hinterlässt keine Testdaten.
 
-## Debian 13 / Proxmox LXC
+## Lizenz
 
-```bash
-sudo bash install_debian13.sh
-```
+Dieses Projekt steht unter der **PolyForm Noncommercial License** (nicht‑kommerziell). Siehe [LICENSE](./LICENSE).
 
-Das Skript installiert Python, venv, Gunicorn, Nginx und richtet einen Systemd-Service ein. Zusätzlich wird automatisch eine `.env` unter `/opt/backuplife/.env` erzeugt (inkl. zufälliger Secrets), sodass die Instanz direkt startklar ist.
-
-Wenn unter `/opt/backuplife/.env` noch Platzhalter wie `change-me` stehen, kann das Install-/Update-Skript die Datei automatisch neu erzeugen (oder du löschst die Datei einmal und führst das Script erneut aus).
-
-## Update (Debian 13)
-
-```bash
-git pull --ff-only
-sudo bash update_debian13.sh
-```
-
-Das Update-Skript deployed den Code nach `/opt/backuplife` (ohne `instance/` zu überschreiben), aktualisiert Dependencies und startet den Service neu.
-
-## Repository-Dokumente
+## Repository‑Dokumente
 
 - [LICENSE](./LICENSE)
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
