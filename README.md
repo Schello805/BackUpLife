@@ -115,3 +115,6 @@ Dieses Projekt steht unter der **PolyForm Noncommercial License** (nicht‑komme
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
 - [SECURITY.md](./SECURITY.md)
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+
+<img width="1374" height="781" alt="Bildschirmfoto 2026-04-09 um 18 57 59" src="https://github.com/user-attachments/assets/f4be33ee-3cbb-47e4-af82-27f8a63ec783" />
+
