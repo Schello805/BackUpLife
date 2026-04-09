@@ -32,44 +32,50 @@
             <div class="section-label mb-2">{{ "%02d"|format(loop.index) }}</div>
             <h2 class="h5 mb-2">{{ category.label }}</h2>
             <p class="text-secondary small mb-4">Hier liegen die Informationen, die Angehörige später nicht erst zusammensuchen sollten: aktuell {{ category.records_count }} Einträge und {{ category.documents_count }} Dokumente.</p>
-            <div class="d-flex flex-wrap gap-2 mb-3">
-              {% if category.status_state == 'na' %}
-                <span class="status-chip status-na">Nicht zutreffend</span>
-              {% elif category.status_state == 'complete' %}
-                <span class="status-chip status-complete">Fertig</span>
-              {% elif category.status_state == 'started' %}
-                <span class="status-chip status-started">Begonnen</span>
-              {% else %}
-                <span class="status-chip status-open">Offen</span>
-              {% endif %}
-              {% if g.user['id'] == profile['owner_user_id'] %}
-                {% if category.status_state == 'na' %}
-                  <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-                    <input type="hidden" name="action" value="applicable">
-                    <input type="hidden" name="next" value="{{ request.full_path }}">
-                    <button class="btn btn-outline-secondary btn-sm">Wieder relevant</button>
-                  </form>
-                {% else %}
-                  {% if category.is_complete %}
-                    <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-                      <input type="hidden" name="action" value="open">
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <button class="btn btn-outline-secondary btn-sm">Als offen</button>
-                    </form>
+            <div class="card-controls mb-3">
+              <div class="card-controls-row">
+                <div class="card-status">
+                  {% if category.status_state == 'na' %}
+                    <span class="status-chip status-na">Nicht zutreffend</span>
+                  {% elif category.status_state == 'complete' %}
+                    <span class="status-chip status-complete">Fertig</span>
+                  {% elif category.status_state == 'started' %}
+                    <span class="status-chip status-started">Begonnen</span>
                   {% else %}
-                    <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-                      <input type="hidden" name="action" value="complete">
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <button class="btn btn-outline-secondary btn-sm">Als fertig</button>
-                    </form>
+                    <span class="status-chip status-open">Offen</span>
                   {% endif %}
-                  <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
-                    <input type="hidden" name="action" value="na">
-                    <input type="hidden" name="next" value="{{ request.full_path }}">
-                    <button class="btn btn-outline-secondary btn-sm">Nicht zutreffend</button>
-                  </form>
+                </div>
+                {% if g.user['id'] == profile['owner_user_id'] %}
+                  <div class="card-actions">
+                    {% if category.status_state == 'na' %}
+                      <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                        <input type="hidden" name="action" value="applicable">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <button class="btn btn-outline-secondary btn-sm">Wieder relevant</button>
+                      </form>
+                    {% else %}
+                      {% if category.is_complete %}
+                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                          <input type="hidden" name="action" value="open">
+                          <input type="hidden" name="next" value="{{ request.full_path }}">
+                          <button class="btn btn-outline-secondary btn-sm">Als offen</button>
+                        </form>
+                      {% else %}
+                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                          <input type="hidden" name="action" value="complete">
+                          <input type="hidden" name="next" value="{{ request.full_path }}">
+                          <button class="btn btn-outline-secondary btn-sm">Als fertig</button>
+                        </form>
+                      {% endif %}
+                      <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                        <input type="hidden" name="action" value="na">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <button class="btn btn-outline-secondary btn-sm">Nicht zutreffend</button>
+                      </form>
+                    {% endif %}
+                  </div>
                 {% endif %}
-              {% endif %}
+              </div>
             </div>
             <a class="btn btn-primary btn-sm mt-auto" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category.key) }}">Kategorie öffnen</a>
           </div>
