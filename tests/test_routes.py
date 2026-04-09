@@ -24,10 +24,11 @@ def test_legal_help_pages_reachable_after_init(logged_in_admin):
         assert resp.status_code == 200
 
 
-def test_footer_shows_version(logged_in_admin):
+def test_footer_shows_version(logged_in_admin, app_module):
     resp = logged_in_admin.get("/dashboard")
     assert resp.status_code == 200
-    assert b"v0.1.0" in resp.data
+    expected = f"v{app_module.APP_VERSION}".encode("utf-8")
+    assert expected in resp.data
 
 
 def test_register_requires_csrf(app, client):
