@@ -41,13 +41,13 @@ Slogan: **Alles Wichtige an einem Ort. Für alle Fälle.**
 ## Lokaler Start
 
 ```bash
-cd /backuplife
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python3 app.py
-```
+	cd /backuplife
+	python3 -m venv .venv
+	source .venv/bin/activate
+	pip install -r requirements.txt
+	./scripts/init_env.sh
+	python3 app.py
+	```
 
 Danach ist die App unter [http://127.0.0.1:8000](http://127.0.0.1:8000) erreichbar.
 
