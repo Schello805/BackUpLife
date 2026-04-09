@@ -62,7 +62,14 @@
       <p><strong>Persönliche Nachricht:</strong><br>{{ wishes['farewell_message'] or '–' }}</p>
       <p><strong>Eigentum / Verteilung:</strong><br>{{ wishes['asset_notes'] or '–' }}</p>
       <p><strong>Abschied / Organisation:</strong><br>{{ wishes['ceremony_notes'] or '–' }}</p>
-      <p><strong>Bucket List:</strong><br>{{ wishes['bucket_list'] or '–' }}</p>
+      <p><strong>Bucket List:</strong></p>
+      <ul>
+        {% for item in bucket_items %}
+          <li {% if item.done %}style="text-decoration: line-through; color: #6c757d;"{% endif %}>{{ item.text }}{% if not item.done %} (offen){% endif %}</li>
+        {% else %}
+          <li>–</li>
+        {% endfor %}
+      </ul>
       <p><strong>Wichtige Kontakte:</strong><br>{{ wishes['important_contacts'] or '–' }}</p>
       <p><strong>Externe Links:</strong><br>{{ wishes['external_links'] or '–' }}</p>
     </section>

@@ -4,6 +4,7 @@ import base64
 import io
 import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
@@ -167,6 +168,45 @@ def dt_de(iso_value: str | None) -> str:
     if tz:
         dt = dt.astimezone(tz)
     return dt.strftime("%d.%m.%Y %H:%M")
+
+
+def parse_bucket_list(raw_value: str | None) -> list[dict[str, Any]]:
+    if not raw_value:
+        return []
+    raw = raw_value.strip()
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            items: list[dict[str, Any]] = []
+            for entry in parsed:
+                if not isinstance(entry, dict):
+                    continue
+                text = str(entry.get("text", "")).strip()
+                if not text:
+                    continue
+                items.append({"text": text, "done": bool(entry.get("done"))})
+            return items
+    except Exception:
+        pass
+    # Backwards compatibility: treat plain text as one item per line.
+    items = []
+    for line in raw.splitlines():
+        text = line.strip().lstrip("-").strip()
+        if text:
+            items.append({"text": text, "done": False})
+    return items
+
+
+def bucket_list_to_storage(items: list[dict[str, Any]]) -> str:
+    normalized: list[dict[str, Any]] = []
+    for item in items:
+        text = str(item.get("text", "")).strip()
+        if not text:
+            continue
+        normalized.append({"text": text, "done": bool(item.get("done"))})
+    return json.dumps(normalized, ensure_ascii=False)
 
 
 def load_env_file() -> None:
@@ -1707,31 +1747,50 @@ def register_routes(app: Flask) -> None:
         if request.method == "POST":
             if g.user["id"] != profile["owner_user_id"]:
                 abort(403)
-                g.db.execute(
-                    """
-                    UPDATE wishes SET
-                        farewell_message = ?, asset_notes = ?, ceremony_notes = ?,
-                        bucket_list = ?, important_contacts = ?, external_links = ?, updated_by = ?, updated_at = ?
-                    WHERE profile_id = ?
-                    """,
-                    (
-                        request.form.get("farewell_message", "").strip(),
-                        request.form.get("asset_notes", "").strip(),
-                        request.form.get("ceremony_notes", "").strip(),
-                        request.form.get("bucket_list", "").strip(),
-                        request.form.get("important_contacts", "").strip(),
-                        request.form.get("external_links", "").strip(),
-                        g.user["id"],
-                        utcnow(),
-                        profile["id"],
-                    ),
-                )
+            bucket_items: list[dict[str, Any]] = []
+            idx = 0
+            while True:
+                text_key = f"bucket_text_{idx}"
+                if text_key not in request.form:
+                    break
+                text = request.form.get(text_key, "").strip()
+                done = bool(request.form.get(f"bucket_done_{idx}"))
+                if text:
+                    bucket_items.append({"text": text, "done": done})
+                idx += 1
+            new_item = request.form.get("bucket_new", "").strip()
+            if new_item:
+                bucket_items.append({"text": new_item, "done": False})
+            g.db.execute(
+                """
+                UPDATE wishes SET
+                    farewell_message = ?, asset_notes = ?, ceremony_notes = ?,
+                    bucket_list = ?, important_contacts = ?, external_links = ?, updated_by = ?, updated_at = ?
+                WHERE profile_id = ?
+                """,
+                (
+                    request.form.get("farewell_message", "").strip(),
+                    request.form.get("asset_notes", "").strip(),
+                    request.form.get("ceremony_notes", "").strip(),
+                    bucket_list_to_storage(bucket_items),
+                    request.form.get("important_contacts", "").strip(),
+                    request.form.get("external_links", "").strip(),
+                    g.user["id"],
+                    utcnow(),
+                    profile["id"],
+                ),
+            )
             g.db.commit()
             log_event("wishes_update", "wishes", "Letzte Wünsche aktualisiert", profile["id"])
             push_toast("Die letzten Wünsche wurden gespeichert.", "success", "Änderungen gespeichert")
             return redirect(url_for("wishes_page", slug=slug))
         log_event("wishes_view", "wishes", "Letzte Wünsche geöffnet", profile["id"])
-        return render_template("wishes.html", profile=profile, wishes=wishes)
+        return render_template(
+            "wishes.html",
+            profile=profile,
+            wishes=wishes,
+            bucket_items=parse_bucket_list(wishes["bucket_list"]),
+        )
 
     @app.route("/verwaltung")
     @login_required
@@ -1907,7 +1966,13 @@ def register_routes(app: Flask) -> None:
             categories.append({"key": key, "label": label, "records": records, "documents": docs})
         wishes = g.db.execute("SELECT * FROM wishes WHERE profile_id = ?", (profile["id"],)).fetchone()
         log_event("export", "export", "Druckexport geöffnet", profile["id"])
-        return render_template("export.html", profile=profile, categories=categories, wishes=wishes)
+        return render_template(
+            "export.html",
+            profile=profile,
+            categories=categories,
+            wishes=wishes,
+            bucket_items=parse_bucket_list(wishes["bucket_list"]),
+        )
 
     @app.route("/hinweis/<slug>")
     def profile_hint(slug: str):

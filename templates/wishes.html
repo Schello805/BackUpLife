@@ -39,9 +39,32 @@
         <textarea class="form-control" name="important_contacts" rows="6" maxlength="4000" placeholder="Zum Beispiel: Notar, Pfarrer, enge Freunde, Vereinskontakte oder andere Personen, die informiert werden sollen." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['important_contacts'] }}</textarea>
       </div>
       <div class="col-12">
-        <label class="form-label">Bucket List (für Sie)</label>
-        <textarea class="form-control" name="bucket_list" rows="6" maxlength="4000" placeholder="Zum Beispiel: Orte, die Sie noch sehen möchten; Gespräche, die Ihnen wichtig sind; Dinge, die Sie unbedingt noch tun oder klären wollen. Diese Liste darf leicht sein, ehrlich und ganz für Sie." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['bucket_list'] }}</textarea>
-        <div class="form-text">Diese Liste ist kein „Muss“. Sie kann auch helfen, in schweren Phasen wieder an Lebenswünsche zu erinnern.</div>
+        <label class="form-label">Bucket List (zum Abhaken)</label>
+        <div class="subtle-card p-3">
+          <div class="small text-secondary mb-3">Manchmal hilft es, in schweren Phasen auch Lebenswünsche sichtbar zu halten. Alles, was abgehakt ist, wird durchgestrichen angezeigt.</div>
+
+          {% if g.user['id'] == profile['owner_user_id'] %}
+            <div class="input-group mb-3">
+              <input class="form-control" name="bucket_new" maxlength="200" placeholder="Neuer Wunsch, z. B. „Noch einmal ans Meer“">
+              <button class="btn btn-outline-secondary btn-sm" type="submit">Hinzufügen</button>
+            </div>
+          {% endif %}
+
+          <div class="list-group">
+            {% for item in bucket_items %}
+              <label class="list-group-item d-flex gap-3 align-items-start">
+                <input class="form-check-input mt-1" type="checkbox" name="bucket_done_{{ loop.index0 }}" {% if item.done %}checked{% endif %} {% if g.user['id'] != profile['owner_user_id'] %}disabled{% endif %}>
+                <input type="hidden" name="bucket_text_{{ loop.index0 }}" value="{{ item.text }}">
+                <span class="flex-grow-1 {% if item.done %}text-decoration-line-through text-secondary{% endif %}">{{ item.text }}</span>
+                {% if not item.done %}
+                  <span class="badge text-bg-warning">offen</span>
+                {% endif %}
+              </label>
+            {% else %}
+              <div class="list-group-item text-secondary">Noch keine Punkte. Wenn Sie möchten, starten Sie klein: ein Gedanke reicht.</div>
+            {% endfor %}
+          </div>
+        </div>
       </div>
       <div class="col-12">
         <label class="form-label">Externe Links</label>
