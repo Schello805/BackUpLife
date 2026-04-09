@@ -118,6 +118,17 @@ echo "BackUpLife wurde installiert."
 echo "Die Konfiguration liegt in $ENV_FILE"
 echo "Dienst: systemctl status backuplife"
 echo
+PRIMARY_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i==\"src\") {print $(i+1); exit}}')"
+if [ -z "${PRIMARY_IP:-}" ]; then
+  PRIMARY_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+fi
+if [ -n "${PRIMARY_IP:-}" ]; then
+  echo "Aufruf: http://$PRIMARY_IP/"
+fi
+if [ "${DOMAIN:-_}" != "_" ]; then
+  echo "Aufruf (Domain): http://$DOMAIN/"
+fi
+echo
 echo "Status:"
 systemctl --no-pager --full status backuplife || true
 echo
