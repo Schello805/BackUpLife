@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block title %}Cookies · Aeterna{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5">
+    <p class="section-label mb-2">Cookies</p>
+    <h1 class="h3 mb-3">Cookie-Hinweis</h1>
+    <p class="text-secondary mb-4">Aeterna setzt keine Tracking- oder Marketing-Cookies ein. Es werden nur technisch notwendige Speichermechanismen verwendet, damit die WebApp zuverlässig und sicher funktioniert.</p>
+
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">Technisch notwendige Cookies</div>
+          <div class="text-secondary small">
+            <div class="fw-semibold text-dark mt-1">Session-Cookie</div>
+            <div>Wird benötigt, um angemeldete Sitzungen sicher zu verwalten (Login, Rollen, Freigaben).</div>
+            <div class="mt-3">Ohne diesen Cookie kann die App nicht genutzt werden, da sonst keine sichere Authentifizierung möglich ist.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">Lokaler Speicher (LocalStorage)</div>
+          <div class="text-secondary small">
+            <div>Um diesen Cookie-Hinweis nicht bei jedem Seitenaufruf erneut zu zeigen, speichert Aeterna eine einfache Bestätigung im Browser (LocalStorage).</div>
+            <div class="mt-2">Sie können dies jederzeit löschen, indem Sie den Website-Speicher in Ihrem Browser zurücksetzen.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="subtle-card p-4 mt-4">
+      <div class="fw-semibold mb-2">Weitere Informationen</div>
+      <div class="text-secondary small">Details zur Verarbeitung von IP-Adresse, Protokollen und Inhalten finden Sie in der <a href="{{ url_for('privacy') }}">Datenschutzerklärung</a>.</div>
+    </div>
+  </div>
+{% endblock %}
+

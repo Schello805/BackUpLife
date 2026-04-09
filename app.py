@@ -54,6 +54,13 @@ ALLOWED_DOCUMENT_EXTENSIONS = {
     ".xlsx",
 }
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
+LEGAL_CONTACT = {
+    "name": "Michael Schellenberger",
+    "street": "Ziegeleistrasse 32",
+    "postal_city": "91572 Bechhofen",
+    "country": "Deutschland",
+    "email": "info@schellenberger.biz",
+}
 APP_CATEGORIES = [
     ("online_accounts", "Onlinekonten"),
     ("devices_media", "Geräte & Datenträger"),
@@ -165,13 +172,26 @@ def create_app() -> Flask:
     app.jinja_env.globals["category_label"] = category_label
     app.jinja_env.globals["current_user_role"] = current_user_role
     app.jinja_env.globals["decrypt_secret"] = decrypt_secret
+    app.jinja_env.globals["LEGAL_CONTACT"] = LEGAL_CONTACT
 
     @app.before_request
     def before_request() -> None:
         g.db = get_db(app)
         g.system_initialized = is_system_initialized()
         g.user = get_current_user()
-        allowed_endpoints = {"login", "register", "setup", "static", "logo_asset", "profile_hint", "profile_emergency"}
+        allowed_endpoints = {
+            "login",
+            "register",
+            "setup",
+            "static",
+            "logo_asset",
+            "profile_hint",
+            "profile_emergency",
+            "imprint",
+            "privacy",
+            "cookies_page",
+            "help_page",
+        }
         if (
             not g.system_initialized
             and request.endpoint not in allowed_endpoints
@@ -1225,14 +1245,27 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/hilfe")
     def help_page():
-        if not g.system_initialized:
-            return redirect(url_for("setup"))
         log_event("help_view", "help", "Hilfeseite geöffnet")
         return render_template(
             "help.html",
             general_links=HELP_PAGE_LINKS,
             provider_links=PROVIDER_LEGACY_LINKS,
         )
+
+    @app.route("/impressum")
+    def imprint():
+        log_event("imprint_view", "legal", "Impressum geöffnet")
+        return render_template("imprint.html")
+
+    @app.route("/datenschutz")
+    def privacy():
+        log_event("privacy_view", "legal", "Datenschutz geöffnet")
+        return render_template("privacy.html")
+
+    @app.route("/cookies")
+    def cookies_page():
+        log_event("cookies_view", "legal", "Cookie-Hinweis geöffnet")
+        return render_template("cookies.html")
 
     @app.route("/nachlass/<slug>")
     @login_required

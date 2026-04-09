@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block title %}Impressum · Aeterna{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5">
+    <p class="section-label mb-2">Impressum</p>
+    <h1 class="h3 mb-3">Anbieterkennzeichnung</h1>
+
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="subtle-card p-4">
+          <div class="fw-semibold mb-2">Angaben gemäß § 5 TMG</div>
+          <div class="mb-3">
+            <div class="fw-semibold">{{ LEGAL_CONTACT.name }}</div>
+            <div>{{ LEGAL_CONTACT.street }}</div>
+            <div>{{ LEGAL_CONTACT.postal_city }}</div>
+            <div>{{ LEGAL_CONTACT.country }}</div>
+          </div>
+          <div class="fw-semibold mb-2">Kontakt</div>
+          <div>E-Mail: <a href="mailto:{{ LEGAL_CONTACT.email }}">{{ LEGAL_CONTACT.email }}</a></div>
+          <div class="mt-4 small text-secondary">Hinweis: Aeterna ist eine Open-Source-WebApp zur privaten Organisation eines digitalen Nachlasses. Inhalte dieser Seite sind keine Rechtsberatung.</div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="subtle-card p-4">
+          <div class="fw-semibold mb-2">Verantwortlich (redaktionell)</div>
+          <div class="text-secondary">Verantwortlich gemäß § 18 Abs. 2 MStV:</div>
+          <div class="fw-semibold mt-1">{{ LEGAL_CONTACT.name }}</div>
+          <div class="mt-4">
+            <div class="fw-semibold mb-2">Weitere Hinweise</div>
+            <div class="small text-secondary">Wenn diese WebApp öffentlich erreichbar betrieben wird, gelten zusätzliche Pflichten (z. B. korrekte Kontaktdaten, Anpassungen an das konkrete Hosting, ggf. Auftragsverarbeitung). Bitte prüfen Sie die Texte für Ihren konkreten Betrieb.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

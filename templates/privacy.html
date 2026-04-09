@@ -1,0 +1,98 @@
+{% extends "layout.html" %}
+{% block title %}Datenschutz · Aeterna{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5">
+    <p class="section-label mb-2">Datenschutz</p>
+    <h1 class="h3 mb-3">Datenschutzerklärung</h1>
+    <p class="text-secondary mb-4">Aeterna ist darauf ausgelegt, sensible Informationen strukturiert zu verwalten. Diese Erklärung beschreibt, welche Daten beim Betrieb der WebApp verarbeitet werden. Sie ersetzt keine Rechtsberatung.</p>
+
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">1. Verantwortlicher</div>
+          <div class="mb-3">
+            <div class="fw-semibold">{{ LEGAL_CONTACT.name }}</div>
+            <div>{{ LEGAL_CONTACT.street }}</div>
+            <div>{{ LEGAL_CONTACT.postal_city }}</div>
+            <div>{{ LEGAL_CONTACT.country }}</div>
+          </div>
+          <div>E-Mail: <a href="mailto:{{ LEGAL_CONTACT.email }}">{{ LEGAL_CONTACT.email }}</a></div>
+
+          <div class="fw-semibold mt-4 mb-2">2. Zwecke der Verarbeitung</div>
+          <div class="text-secondary small">
+            <div>Bereitstellung eines geschützten Benutzerbereichs (Login, Rollen, Freigaben).</div>
+            <div>Speicherung von Nachlassinformationen (Einträge, Dokumente, Wünsche).</div>
+            <div>Nachvollziehbarkeit und Sicherheit (Audit-Logs, letzte Änderungen, Zugriffe).</div>
+            <div>E-Mail-Funktionen (z. B. Testmail, Passwort-Reset), sofern konfiguriert.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">3. Welche Daten werden verarbeitet?</div>
+          <div class="text-secondary small">
+            <div class="fw-semibold text-dark mt-1">Kontodaten</div>
+            <div>Name, E-Mail-Adresse, Passwort-Hash (Passwort selbst wird nicht im Klartext gespeichert).</div>
+            <div class="fw-semibold text-dark mt-3">Nachlassinhalte</div>
+            <div>Von Erstellern eingegebene Inhalte (z. B. Konten, Verträge, Hinweise), hochgeladene Dokumente, letzte Wünsche.</div>
+            <div class="fw-semibold text-dark mt-3">Sicherheits- und Protokolldaten</div>
+            <div>IP-Adresse, User-Agent, Zeitpunkte, Pfade und Aktionen (Login, Ansicht, Export, Änderungen).</div>
+            <div class="fw-semibold text-dark mt-3">E-Mail / SMTP</div>
+            <div>SMTP-Host, Benutzername, Absenderadresse; SMTP-Passwort wird verschlüsselt gespeichert.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">4. Rechtsgrundlagen (DSGVO)</div>
+          <div class="text-secondary small">
+            <div>Art. 6 Abs. 1 lit. b DSGVO: Vertrags-/Nutzungsdurchführung (Bereitstellung der WebApp-Funktionen).</div>
+            <div>Art. 6 Abs. 1 lit. f DSGVO: berechtigtes Interesse (IT-Sicherheit, Missbrauchserkennung, Nachvollziehbarkeit).</div>
+            <div>Art. 6 Abs. 1 lit. c DSGVO: sofern rechtliche Pflichten bestehen (betriebsabhängig).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">5. Empfänger & Drittanbieter</div>
+          <div class="text-secondary small">
+            <div>Standardmäßig verbleiben Daten auf dem Server, auf dem Aeterna betrieben wird.</div>
+            <div>Bei E-Mail-Versand werden Inhalte an den konfigurierten SMTP-Server übertragen.</div>
+            <div>Die Oberfläche lädt Bootstrap von einem CDN (jsDelivr). Dabei wird Ihre IP-Adresse technisch bedingt an den CDN-Anbieter übermittelt.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">6. Speicherdauer</div>
+          <div class="text-secondary small">
+            <div>Konten und Inhalte bleiben gespeichert, bis sie durch den Betreiber gelöscht werden.</div>
+            <div>Protokolle dienen der Nachvollziehbarkeit und Sicherheit; die Speicherdauer hängt vom Betrieb ab.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="subtle-card p-4 h-100">
+          <div class="fw-semibold mb-2">7. Ihre Rechte</div>
+          <div class="text-secondary small">
+            <div>Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung.</div>
+            <div>Widerspruch gegen Verarbeitung auf Basis berechtigter Interessen.</div>
+            <div>Datenübertragbarkeit, soweit anwendbar.</div>
+            <div class="mt-2">Kontakt: <a href="mailto:{{ LEGAL_CONTACT.email }}">{{ LEGAL_CONTACT.email }}</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 small text-secondary">Stand: April 2026 (bitte bei Änderungen am Betrieb prüfen und aktualisieren)</div>
+  </div>
+{% endblock %}

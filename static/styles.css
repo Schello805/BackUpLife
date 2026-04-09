@@ -344,6 +344,35 @@ a {
   color: var(--aeterna-accent-dark);
 }
 
+.cookie-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1090;
+  padding: 0.9rem 1rem;
+  background: rgba(250, 252, 255, 0.9);
+  border-top: 1px solid rgba(16, 54, 84, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.cookie-banner-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+@media (min-width: 768px) {
+  .cookie-banner-inner {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
 .empty-state {
   border: 1px dashed rgba(16, 54, 84, 0.18);
   border-radius: 1.1rem;

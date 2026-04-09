@@ -94,6 +94,9 @@
           </div>
           <div class="d-flex flex-wrap gap-3 small">
             <a href="{{ url_for('help_page') }}" class="link-secondary">Mehr Hilfe</a>
+            <a href="{{ url_for('imprint') }}" class="link-secondary">Impressum</a>
+            <a href="{{ url_for('privacy') }}" class="link-secondary">Datenschutz</a>
+            <a href="{{ url_for('cookies_page') }}" class="link-secondary">Cookies</a>
             {% if g.user and g.user['is_admin'] %}
               <a href="{{ url_for('admin') }}" class="link-secondary">Admin</a>
             {% endif %}
@@ -102,12 +105,41 @@
         </div>
       </footer>
     </div>
+
+    <div class="cookie-banner no-print" id="cookieBanner" hidden>
+      <div class="cookie-banner-inner">
+        <div class="small">
+          <div class="fw-semibold mb-1">Cookie-Hinweis</div>
+          <div class="text-secondary">Aeterna verwendet nur technisch notwendige Cookies (z. B. für die Anmeldung). Kein Tracking. Details in <a href="{{ url_for('cookies_page') }}">Cookies</a> und <a href="{{ url_for('privacy') }}">Datenschutz</a>.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="cookieBannerOk" type="button">Verstanden</button>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
       document.querySelectorAll('.toast').forEach((element) => {
         const toast = new bootstrap.Toast(element);
         toast.show();
       });
+
+      (function () {
+        const key = 'aeterna_cookie_notice_ack';
+        const banner = document.getElementById('cookieBanner');
+        const ok = document.getElementById('cookieBannerOk');
+        if (!banner || !ok) return;
+        try {
+          const acknowledged = localStorage.getItem(key) === '1';
+          if (!acknowledged) banner.hidden = false;
+          ok.addEventListener('click', () => {
+            try { localStorage.setItem(key, '1'); } catch (e) {}
+            banner.hidden = true;
+          });
+        } catch (e) {
+          banner.hidden = false;
+          ok.addEventListener('click', () => { banner.hidden = true; });
+        }
+      })();
     </script>
   </body>
 </html>
