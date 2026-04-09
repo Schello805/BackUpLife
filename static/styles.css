@@ -169,6 +169,10 @@ a {
   color: rgba(255, 255, 255, 0.8);
 }
 
+.hero-lead {
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .metric-card,
 .subtle-card {
   background: var(--aeterna-surface-strong);
