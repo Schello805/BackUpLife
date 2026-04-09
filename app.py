@@ -19,6 +19,8 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -49,6 +51,11 @@ BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
 DEFAULT_DB_PATH = INSTANCE_DIR / "aeterna.db"
 DEFAULT_UPLOAD_DIR = INSTANCE_DIR / "uploads"
+APP_VERSION = "0.1.0"
+GITHUB_REPO = "Schello805/BackUpLife"
+GITHUB_PROJECT_URL = "https://github.com/Schello805/BackUpLife"
+UPDATE_CHECK_TTL_SECONDS = 6 * 60 * 60
+_UPDATE_CACHE: dict[str, Any] = {"checked_at": 0, "status": "unknown", "latest": ""}
 DEFAULT_PROFILE_STORAGE_MB = 100
 DEFAULT_REQUIRE_EMAIL_VERIFICATION = 1
 DEFAULT_ALLOW_REGISTRATION = 1
@@ -89,6 +96,68 @@ APP_CATEGORIES = [
     ("important_items", "Unterlagen & Notgroschen"),
     ("home_network", "Heimnetz & Smarthome"),
 ]
+
+
+def parse_version(value: str) -> tuple[int, int, int]:
+    raw = (value or "").strip().lower()
+    if raw.startswith("v"):
+        raw = raw[1:]
+    parts = [p for p in raw.split(".") if p.strip()]
+    nums: list[int] = []
+    for part in parts[:3]:
+        m = re.match(r"^(\d+)", part)
+        nums.append(int(m.group(1)) if m else 0)
+    while len(nums) < 3:
+        nums.append(0)
+    return int(nums[0]), int(nums[1]), int(nums[2])
+
+
+def is_version_newer(latest: str, current: str) -> bool:
+    return parse_version(latest) > parse_version(current)
+
+
+def fetch_latest_github_version(timeout_seconds: float = 1.2) -> str:
+    # Prefer releases/latest; fallback to tags.
+    headers = {"User-Agent": f"BackUpLife/{APP_VERSION}", "Accept": "application/vnd.github+json"}
+    for url in [
+        f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+        f"https://api.github.com/repos/{GITHUB_REPO}/tags?per_page=1",
+    ]:
+        try:
+            req = Request(url, headers=headers)
+            with urlopen(req, timeout=timeout_seconds) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, dict) and data.get("tag_name"):
+                return str(data["tag_name"])
+            if isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("name"):
+                return str(data[0]["name"])
+        except (URLError, HTTPError, ValueError, TimeoutError):
+            continue
+        except Exception:
+            continue
+    return ""
+
+
+def get_update_info() -> dict[str, Any]:
+    # Avoid network in tests or when explicitly disabled.
+    try:
+        if current_app.testing:
+            return {"status": "disabled", "latest": "", "checked_at": None}
+    except Exception:
+        pass
+    if os.environ.get("BACKUPLIFE_DISABLE_UPDATE_CHECK") == "1":
+        return {"status": "disabled", "latest": "", "checked_at": None}
+
+    now = int(time.time())
+    if int(_UPDATE_CACHE.get("checked_at") or 0) and now - int(_UPDATE_CACHE.get("checked_at") or 0) < UPDATE_CHECK_TTL_SECONDS:
+        return dict(_UPDATE_CACHE)
+
+    latest = fetch_latest_github_version()
+    status = "unknown"
+    if latest:
+        status = "update_available" if is_version_newer(latest, APP_VERSION) else "up_to_date"
+    _UPDATE_CACHE.update({"checked_at": now, "status": status, "latest": latest})
+    return dict(_UPDATE_CACHE)
 
 HELP_PAGE_LINKS = [
     {
@@ -3181,6 +3250,9 @@ self.addEventListener('fetch', (event) => {
             "active_profile": active_profile,
             "visible_profiles": visible_profiles,
             "system_initialized": getattr(g, "system_initialized", False),
+            "app_version": APP_VERSION,
+            "update_info": get_update_info(),
+            "github_project_url": GITHUB_PROJECT_URL,
         }
 
     @app.errorhandler(403)
