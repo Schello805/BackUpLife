@@ -55,24 +55,17 @@
             {% for item in bucket_items %}
               {% if g.user['id'] == profile['owner_user_id'] %}
                 <div class="list-group-item">
-                  <div class="d-flex gap-3 align-items-start">
-                    <input class="form-check-input mt-1" type="checkbox" name="bucket_done_{{ loop.index0 }}" {% if item.done %}checked{% endif %}>
-                    <div class="flex-grow-1">
-                      <input
-                        class="form-control form-control-sm {% if item.done %}text-decoration-line-through text-secondary{% endif %}"
-                        name="bucket_text_{{ loop.index0 }}"
-                        maxlength="200"
-                        value="{{ item.text }}"
-                        aria-label="Bucket List Eintrag {{ loop.index }}"
-                        required
-                      >
-                      <div class="d-flex justify-content-between align-items-center mt-2">
-                        <div class="small text-secondary">
-                          {% if item.done %}Erledigt{% else %}Offen{% endif %}
-                        </div>
-                        <button class="btn btn-outline-danger btn-sm" type="submit" name="bucket_delete" value="{{ loop.index0 }}" onclick="return confirm('Eintrag wirklich löschen?')">Löschen</button>
-                      </div>
-                    </div>
+                  <div class="d-flex gap-3 align-items-center">
+                    <input class="form-check-input mt-0" type="checkbox" name="bucket_done_{{ loop.index0 }}" {% if item.done %}checked{% endif %} aria-label="Erledigt">
+                    <input
+                      class="form-control form-control-sm flex-grow-1 {% if item.done %}text-decoration-line-through text-secondary{% endif %}"
+                      name="bucket_text_{{ loop.index0 }}"
+                      maxlength="200"
+                      value="{{ item.text }}"
+                      aria-label="Bucket List Eintrag {{ loop.index }}"
+                      required
+                    >
+                    <button class="btn btn-outline-danger btn-sm" type="submit" name="bucket_delete" value="{{ loop.index0 }}" onclick="return confirm('Eintrag wirklich löschen?')">Löschen</button>
                   </div>
                 </div>
               {% else %}
