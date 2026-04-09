@@ -67,7 +67,7 @@
                       aria-label="Bucket List Eintrag {{ loop.index }} bearbeiten"
                       disabled
                     >
-                    <button class="btn btn-outline-secondary btn-sm bucket-edit-btn" type="button" aria-label="Eintrag bearbeiten" title="Bearbeiten">Stift</button>
+                    <button class="btn btn-outline-secondary btn-sm bucket-edit-btn" type="button" aria-label="Eintrag bearbeiten" title="Bearbeiten">Edit</button>
                     <button class="btn btn-outline-danger btn-sm" type="submit" name="bucket_delete" value="{{ loop.index0 }}" onclick="return confirm('Eintrag wirklich löschen?')">Löschen</button>
                   </div>
                 </div>
@@ -127,7 +127,7 @@
             edit.classList.add('d-none');
             edit.disabled = true;
             display.classList.remove('d-none');
-            btn.textContent = 'Stift';
+            btn.textContent = 'Edit';
             btn.classList.remove('btn-outline-primary');
             btn.classList.add('btn-outline-secondary');
           }
