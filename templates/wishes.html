@@ -57,14 +57,17 @@
                 <div class="list-group-item">
                   <div class="d-flex gap-3 align-items-center">
                     <input class="form-check-input mt-0" type="checkbox" name="bucket_done_{{ loop.index0 }}" {% if item.done %}checked{% endif %} aria-label="Erledigt">
+                    <input type="hidden" class="bucket-hidden-field" name="bucket_text_{{ loop.index0 }}" value="{{ item.text }}">
+                    <span class="flex-grow-1 bucket-display-field {% if item.done %}text-decoration-line-through text-secondary{% endif %}" aria-label="Bucket List Eintrag {{ loop.index }}">{{ item.text }}</span>
                     <input
-                      class="form-control form-control-sm flex-grow-1 {% if item.done %}text-decoration-line-through text-secondary{% endif %}"
-                      name="bucket_text_{{ loop.index0 }}"
+                      class="form-control form-control-sm flex-grow-1 bucket-edit-field d-none"
+                      type="text"
                       maxlength="200"
                       value="{{ item.text }}"
-                      aria-label="Bucket List Eintrag {{ loop.index }}"
-                      required
+                      aria-label="Bucket List Eintrag {{ loop.index }} bearbeiten"
+                      disabled
                     >
+                    <button class="btn btn-outline-secondary btn-sm bucket-edit-btn" type="button" aria-label="Eintrag bearbeiten" title="Bearbeiten">Stift</button>
                     <button class="btn btn-outline-danger btn-sm" type="submit" name="bucket_delete" value="{{ loop.index0 }}" onclick="return confirm('Eintrag wirklich löschen?')">Löschen</button>
                   </div>
                 </div>
@@ -95,4 +98,81 @@
       {% endif %}
     </form>
   </div>
+
+  {% if g.user['id'] == profile['owner_user_id'] %}
+    <script>
+      (function () {
+        function setEditing(row, isEditing) {
+          const display = row.querySelector('.bucket-display-field');
+          const edit = row.querySelector('.bucket-edit-field');
+          const hidden = row.querySelector('.bucket-hidden-field');
+          const btn = row.querySelector('.bucket-edit-btn');
+          if (!display || !edit || !hidden || !btn) return;
+
+          if (isEditing) {
+            display.classList.add('d-none');
+            edit.classList.remove('d-none');
+            edit.disabled = false;
+            edit.value = hidden.value || '';
+            edit.focus();
+            try { edit.setSelectionRange(edit.value.length, edit.value.length); } catch (e) {}
+            btn.textContent = 'OK';
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-outline-primary');
+          } else {
+            // Persist the current edit value into the hidden field used by the backend.
+            hidden.value = (edit.value || '').trim();
+            display.textContent = hidden.value;
+
+            edit.classList.add('d-none');
+            edit.disabled = true;
+            display.classList.remove('d-none');
+            btn.textContent = 'Stift';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-outline-secondary');
+          }
+        }
+
+        document.querySelectorAll('.bucket-edit-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const row = btn.closest('.list-group-item');
+            if (!row) return;
+            const edit = row.querySelector('.bucket-edit-field');
+            const isEditing = edit ? !edit.classList.contains('d-none') : false;
+            setEditing(row, !isEditing);
+          });
+        });
+
+        // Keep hidden values in sync while typing and allow Enter/Escape UX.
+        document.querySelectorAll('.bucket-edit-field').forEach((field) => {
+          field.addEventListener('input', () => {
+            const row = field.closest('.list-group-item');
+            const hidden = row ? row.querySelector('.bucket-hidden-field') : null;
+            if (!hidden) return;
+            hidden.value = field.value;
+          });
+
+          field.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const row = field.closest('.list-group-item');
+              if (row) setEditing(row, false);
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              const row = field.closest('.list-group-item');
+              const hidden = row ? row.querySelector('.bucket-hidden-field') : null;
+              if (hidden) field.value = hidden.value || '';
+              if (row) setEditing(row, false);
+            }
+          });
+
+          field.addEventListener('blur', () => {
+            const row = field.closest('.list-group-item');
+            if (row) setEditing(row, false);
+          });
+        });
+      })();
+    </script>
+  {% endif %}
 {% endblock %}
