@@ -5,8 +5,8 @@
     <div class="row g-4 align-items-center">
       <div class="col-lg-8">
         <p class="section-label mb-2">Verwaltung</p>
-        <h1 class="display-6 fw-semibold mb-3">Benutzer, Freigaben und Zugriffsprotokolle transparent an einem Ort</h1>
-        <p class="mb-0 text-white-50">Hier definieren Sie, wer was sehen darf. Gleichzeitig behalten Sie mit Audit-Logs im Blick, wer sich wann angemeldet, Inhalte gelesen oder exportiert hat.</p>
+        <h1 class="display-6 fw-semibold mb-3">Verantwortung teilen, ohne die Kontrolle zu verlieren.</h1>
+        <p class="mb-0 text-white-50">Hier entscheiden Sie mit Ruhe und Klarheit, wer im Ernstfall worauf zugreifen darf. Gleichzeitig bleibt nachvollziehbar, was tatsächlich passiert ist und wer welche Inhalte gesehen hat.</p>
       </div>
       <div class="col-lg-4">
         <div class="subtle-card p-4 bg-white text-dark">
@@ -26,7 +26,7 @@
       <div class="col-xl-5">
         <div class="page-shell p-4 h-100">
           <div class="section-label mb-2">Benutzerverwaltung</div>
-          <h2 class="h4 mb-3">Neuen Benutzer anlegen</h2>
+          <h2 class="h4 mb-3">Einen weiteren Menschen sicher einbinden</h2>
           <form method="post" action="{{ url_for('create_user') }}" class="vstack gap-3" novalidate>
             <input class="form-control" name="display_name" minlength="2" placeholder="Name" required>
             <input type="email" class="form-control" name="email" placeholder="E-Mail-Adresse" required>
@@ -45,7 +45,7 @@
       <div class="col-xl-7">
         <div class="page-shell p-4 h-100">
           <div class="section-label mb-2">Freigaben</div>
-          <h2 class="h4 mb-3">Zugriff für Ihren Nachlass vergeben</h2>
+          <h2 class="h4 mb-3">Zugriff bewusst und nachvollziehbar vergeben</h2>
           <form method="post" action="{{ url_for('create_grant') }}" class="row g-3" novalidate>
             <div class="col-md-6">
               <label class="form-label">Empfänger</label>
@@ -107,7 +107,7 @@
 
     <div class="page-shell p-4 mb-4">
       <div class="section-label mb-2">Bestehende Konten</div>
-      <h2 class="h4 mb-3">Benutzerübersicht</h2>
+      <h2 class="h4 mb-3">Wer bereits eingebunden ist</h2>
       <div class="surface-table">
         <div class="table-responsive">
           <table class="table align-middle">
@@ -143,7 +143,7 @@
 
   <div class="page-shell p-4">
     <div class="section-label mb-2">Audit-Log</div>
-    <h2 class="h4 mb-3">Nachvollziehbare Zugriffe und Änderungen</h2>
+    <h2 class="h4 mb-3">Was wann passiert ist und wer beteiligt war</h2>
     <div class="surface-table">
       <div class="table-responsive">
         <table class="table align-middle">

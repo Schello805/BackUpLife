@@ -6,7 +6,7 @@
       <div>
         <p class="section-label mb-2">Kategorieansicht</p>
         <h1 class="h3 mb-1">{{ category_label(category_key) }}</h1>
-        <p class="text-secondary mb-0">{{ profile['title'] }} · Alles für diese Kategorie an einem Ort</p>
+        <p class="text-secondary mb-0">{{ profile['title'] }} · Alles, was in dieser Kategorie später schnell gefunden werden soll, ist hier gebündelt.</p>
       </div>
       <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary" href="{{ url_for('profile_dashboard', slug=profile['slug']) }}">Zur Übersicht</a>
@@ -27,6 +27,83 @@
   <div class="row g-4">
     <div class="col-xl-8">
       <div class="page-shell p-4">
+        {% if g.user['id'] == profile['owner_user_id'] %}
+          <div class="subtle-card p-3 mb-3">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+              <div>
+                <div class="section-label mb-1">Status</div>
+                <div class="fw-semibold">{{ category_status.label }}</div>
+                <div class="small text-secondary">
+                  {% if category_status.updated_at %}
+                    Zuletzt geändert: {{ category_status.updated_at.replace('T', ' ') }}
+                  {% else %}
+                    Noch nicht bewertet. Optional: Markieren Sie Kategorien als fertig oder nicht zutreffend.
+                  {% endif %}
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                {% if category_status.state == 'na' %}
+                  <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                    <input type="hidden" name="action" value="applicable">
+                    <button class="btn btn-outline-secondary btn-sm">Wieder relevant</button>
+                  </form>
+                {% else %}
+                  {% if category_status.is_complete %}
+                    <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                      <input type="hidden" name="action" value="open">
+                      <button class="btn btn-outline-secondary btn-sm">Als offen</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                      <input type="hidden" name="action" value="complete">
+                      <button class="btn btn-outline-secondary btn-sm">Als fertig</button>
+                    </form>
+                  {% endif %}
+                  <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                    <input type="hidden" name="action" value="na">
+                    <button class="btn btn-outline-secondary btn-sm">Nicht zutreffend</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if category_key == 'online_accounts' %}
+          <div class="subtle-card p-3 mb-3">
+            <div class="fw-semibold mb-1">Hinweis: Digitale Erben bei großen Anbietern</div>
+            <div class="small text-secondary mb-2">Viele Anbieter bieten inzwischen „Nachlasskontakte“ oder automatische Regeln für inaktive Konten. Wenn Sie diese Einstellungen im jeweiligen Konto aktiv setzen, hilft das Angehörigen später enorm.</div>
+            {% if g.user['id'] == profile['owner_user_id'] %}
+              <div class="d-flex flex-wrap gap-2">
+                {% for item in provider_links[:3] %}
+                  <a class="btn btn-outline-secondary btn-sm" href="{{ item.url }}" target="_blank" rel="noreferrer">{{ item.provider }}</a>
+                {% endfor %}
+                <a class="btn btn-primary btn-sm" href="{{ url_for('help_page') }}">Mehr Hilfe</a>
+              </div>
+            {% endif %}
+          </div>
+        {% elif category_key == 'devices_media' %}
+          <div class="subtle-card p-3 mb-3">
+            <div class="fw-semibold mb-1">Geräte & Datenträger</div>
+            <div class="small text-secondary">Hier gehören PC-/Laptop-Zugänge, PINs (Tablet/Smartphone), Alarmanlage, Haustür-Codes, sowie Hinweise zu externen Festplatten, USB-Sticks oder Backup-Systemen hinein.</div>
+          </div>
+        {% elif category_key == 'web_domains' %}
+          <div class="subtle-card p-3 mb-3">
+            <div class="fw-semibold mb-1">Websites & Domains</div>
+            <div class="small text-secondary">Wenn es Domains, Websites oder Hosting gibt: hinterlegen Sie Registrar/Provider, Zugang, Kündigungsfristen und den Zweck (weiterführen, stilllegen, übertragen).</div>
+          </div>
+        {% elif category_key == 'documents' %}
+          <div class="subtle-card p-3 mb-3">
+            <div class="fw-semibold mb-1">Rechtliches & Vollmachten</div>
+            <div class="small text-secondary">Vollmachten, Vorsorgeunterlagen, Testamente oder notarielle Dokumente sind hier am schnellsten auffindbar. Wenn es Originale gibt: bitte auch den physischen Ort notieren.</div>
+          </div>
+        {% elif category_key == 'important_items' %}
+          <div class="subtle-card p-3 mb-3">
+            <div class="fw-semibold mb-1">Unterlagen-Orte & Notgroschen</div>
+            <div class="small text-secondary">Wo liegen Mappe, Ordner, Schlüssel, Bargeld oder wichtige Zugänge? Je klarer der Ort beschrieben ist, desto weniger Stress entsteht in den ersten Stunden und Tagen.</div>
+          </div>
+        {% endif %}
+
         <div class="d-flex justify-content-between align-items-center mb-3">
           <div>
             <div class="section-label mb-2">Einträge</div>
@@ -66,7 +143,7 @@
                     </td>
                   </tr>
                 {% else %}
-                  <tr><td colspan="5" class="text-secondary">Noch keine Einträge vorhanden.</td></tr>
+                  <tr><td colspan="5" class="text-secondary">Hier ist noch nichts hinterlegt. Wenn du diesen Bereich später brauchst, wird jede früh gepflegte Information hier Zeit und Stress sparen.</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -115,7 +192,7 @@
               </div>
             </div>
           {% else %}
-            <div class="empty-state p-4 text-center text-secondary">Noch keine Dokumente hochgeladen.</div>
+            <div class="empty-state p-4 text-center text-secondary">Noch keine Dokumente hochgeladen. Gerade im Ernstfall sind gescannte Unterlagen oft die schnellste Hilfe.</div>
           {% endfor %}
         </div>
       </div>

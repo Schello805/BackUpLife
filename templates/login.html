@@ -8,15 +8,15 @@
           <div class="d-flex align-items-center gap-4 mb-4">
             <img src="{{ url_for('logo_asset') }}" alt="Aeterna Logo" class="auth-brand">
             <div>
-              <p class="section-label mb-2">Sicher. Ernsthaft. Familiengeeignet.</p>
-              <h1 class="display-6 fw-semibold mb-3">Digitaler Nachlass ohne Chaos für Angehörige.</h1>
-              <p class="mb-0 text-white-50">Aeterna bündelt Zugangsdaten, Verträge, Versicherungen, Dokumente und letzte Wünsche in einer klaren, nachvollziehbaren Struktur mit Freigaben und Audit-Log.</p>
+              <p class="section-label mb-2">Sicher. Ruhig. Verlässlich.</p>
+              <h1 class="display-6 fw-semibold mb-3">Damit im Ernstfall nicht alles an einer Person hängen bleibt.</h1>
+              <p class="mb-0 text-white-50">Aeterna hilft dabei, das Schwierige geordnet vorzubereiten: Zugänge, Unterlagen, Wünsche und wichtige Hinweise so, dass Angehörige später schneller Orientierung finden und weniger allein gelassen sind.</p>
             </div>
           </div>
           <ul class="hint-list ps-0 mb-0">
-            <li>Eigene URL pro Ersteller für Hinweise in Geldbörse oder Unterlagen</li>
-            <li>Leserzugriff pro Nachlass oder nur für einzelne Kategorien</li>
-            <li>Verlässliche Rückmeldungen bei jeder Aktion über Toast-Benachrichtigungen</li>
+            <li>Eigene Notfall-Seite pro Ersteller für Geldbörse, Unterlagen oder Notfallmappe</li>
+            <li>Zugriff nur dort, wo er bewusst freigegeben wurde</li>
+            <li>Ruhige Rückmeldungen bei jeder Aktion, damit nichts im Unklaren bleibt</li>
           </ul>
         </div>
       </div>
@@ -24,7 +24,7 @@
         <div class="page-shell p-4 p-lg-5">
           <p class="section-label mb-2">Anmeldung</p>
           <h2 class="h3 mb-3">Willkommen zurück</h2>
-          <p class="text-secondary mb-4">Bitte melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an.</p>
+          <p class="text-secondary mb-4">Melden Sie sich in Ihrem geschützten Bereich an. Wenn Sie gerade in einer belastenden Situation auf diese Seite kommen, gehen Sie Schritt für Schritt vor.</p>
           {% if target_slug %}
             <div class="info-chip mb-3">Ziel-Nachlass: {{ target_slug }}</div>
           {% endif %}
@@ -39,6 +39,9 @@
             </div>
             <button class="btn btn-primary">Jetzt anmelden</button>
           </form>
+          <div class="mt-3">
+            <a class="btn btn-outline-secondary w-100" href="{{ url_for('register') }}">Registrieren</a>
+          </div>
           <div class="mt-4 d-flex flex-wrap justify-content-between gap-2 small">
             <a href="{{ url_for('forgot_password') }}">Passwort vergessen?</a>
             <span class="text-secondary">Nur Deutsch · Responsiv mit Bootstrap</span>

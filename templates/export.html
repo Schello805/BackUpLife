@@ -20,7 +20,7 @@
       <button class="btn btn-primary" onclick="window.print()">Jetzt drucken</button>
     </div>
     <h1 class="h2">{{ profile['title'] }}</h1>
-    <p class="text-secondary">Persönliche URL: /hinweis/{{ profile['slug'] }}</p>
+    <p class="text-secondary">Persönliche Notfall-URL: /notfall/{{ profile['slug'] }}</p>
 
     {% for category in categories %}
       <section class="mt-5 {% if not loop.first %}page-break{% endif %}">

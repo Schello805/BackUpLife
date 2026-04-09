@@ -6,7 +6,7 @@
       <div>
         <p class="section-label mb-2">{{ category_label(category_key) }}</p>
         <h1 class="h3 mb-2">{% if record %}Eintrag bearbeiten{% else %}Neuen Eintrag anlegen{% endif %}</h1>
-        <p class="text-secondary mb-0">Speichern Sie nur die Informationen, die für Angehörige später wirklich hilfreich sind.</p>
+        <p class="text-secondary mb-0">Denken Sie dabei nicht nur an Vollständigkeit, sondern an Verständlichkeit. Hinterlegen Sie genau das, was jemand in einer belastenden Situation schnell begreifen und nutzen kann.</p>
       </div>
       <a class="btn btn-outline-secondary" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category_key) }}">Zurück</a>
     </div>

@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% block title %}Registrieren · Aeterna{% endblock %}
+{% block content %}
+  <div class="auth-wrapper">
+    <div class="row g-4 align-items-center w-100">
+      <div class="col-lg-7">
+        <div class="hero-panel p-4 p-lg-5">
+          <div class="d-flex align-items-center gap-4 mb-4">
+            <img src="{{ url_for('logo_asset') }}" alt="Aeterna Logo" class="auth-brand">
+            <div>
+              <p class="section-label mb-2">Neues Konto</p>
+              <h1 class="display-6 fw-semibold mb-3">Ein Zugang für Menschen, die im Ernstfall Orientierung brauchen.</h1>
+              <p class="mb-0 text-white-50">Je nach Rolle begleiten Sie mit diesem Konto entweder den eigenen Nachlass oder helfen als berechtigte Person dabei, wichtige Informationen verlässlich wiederzufinden.</p>
+            </div>
+          </div>
+          <ul class="hint-list ps-0 mb-0">
+            <li><strong>Leser:</strong> sehen freigegebene Inhalte und können sie im Notfall nutzen</li>
+            <li><strong>Ersteller:</strong> ordnen den eigenen Nachlass mit Ruhe und Klarheit</li>
+            <li><strong>Admin:</strong> bleibt bewusst ein interner, besonders geschützter Zugang</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="page-shell p-4 p-lg-5">
+          <p class="section-label mb-2">Registrierung</p>
+          <h2 class="h3 mb-3">Ein neues Benutzerkonto anlegen</h2>
+          {% set values = form_values if form_values else {} %}
+          <form method="post" class="vstack gap-3" novalidate>
+            <div>
+              <label class="form-label">Name</label>
+              <input class="form-control" name="display_name" minlength="2" value="{{ values.get('display_name', '') }}" required>
+            </div>
+            <div>
+              <label class="form-label">E-Mail-Adresse</label>
+              <input type="email" class="form-control" name="email" value="{{ values.get('email', '') }}" required>
+            </div>
+            <div>
+              <label class="form-label">Rolle</label>
+              <select class="form-select" name="role">
+                <option value="reader" {% if values.get('role') != 'creator' %}selected{% endif %}>Leser</option>
+                <option value="creator" {% if values.get('role') == 'creator' %}selected{% endif %}>Ersteller</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Passwort</label>
+              <input type="password" class="form-control" name="password" minlength="10" required>
+            </div>
+            <button class="btn btn-primary">Registrieren</button>
+          </form>
+          <div class="mt-4 small">
+            <a href="{{ url_for('login') }}">Bereits registriert? Zum Login</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -5,8 +5,8 @@
     <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
       <div>
         <p class="section-label mb-2">Admin</p>
-        <h1 class="h3 mb-2">System und SMTP sauber getrennt verwalten</h1>
-        <p class="text-secondary mb-0">Dieser Bereich ist nur für Admins gedacht. Hier hinterlegen Sie Systemwerte und die Mail-Konfiguration für Passwort-Reset und Freigabebenachrichtigungen.</p>
+        <h1 class="h3 mb-2">Die technischen Grundlagen ruhig und verlässlich pflegen</h1>
+        <p class="text-secondary mb-0">Dieser Bereich ist bewusst nüchtern gehalten. Hier sorgen Sie dafür, dass Benachrichtigungen, Passwort-Reset und Systembetrieb im Hintergrund funktionieren, ohne dass Nutzer später darüber stolpern.</p>
       </div>
       <div class="d-flex flex-wrap gap-2">
         <span class="info-chip">{{ stats.users }} Benutzer</span>
@@ -18,7 +18,7 @@
   </div>
   <div class="page-shell p-4 p-lg-5">
     <div class="section-label mb-2">SMTP</div>
-    <h2 class="h4 mb-3">Mailserver-Konfiguration</h2>
+    <h2 class="h4 mb-3">E-Mails verlässlich versenden</h2>
     <form method="post" class="row g-3" novalidate>
       <div class="col-md-6">
         <label class="form-label">Host</label>
@@ -56,8 +56,9 @@
         <label class="form-label">Test-E-Mail an</label>
         <input class="form-control" name="test_recipient" type="email" placeholder="optional">
       </div>
-      <div class="col-12">
-        <button class="btn btn-primary">Speichern</button>
+      <div class="col-12 d-flex flex-wrap gap-2">
+        <button class="btn btn-primary" type="submit">Speichern</button>
+        <button class="btn btn-outline-secondary" type="submit" name="send_test_mail" value="1">Speichern und Testmail senden</button>
       </div>
     </form>
   </div>

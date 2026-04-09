@@ -84,15 +84,20 @@
             <div class="small">
               <div class="fw-semibold">Aeterna</div>
               <div class="text-secondary">Sichere Verwaltung eines digitalen Nachlasses mit nachvollziehbaren Freigaben.</div>
+              {% if g.user and active_profile %}
+                <div class="mt-1">
+                  <span class="fw-semibold">Ihre Nachlass-URL:</span>
+                  <a href="{{ request.url_root.rstrip('/') }}{{ url_for('profile_emergency', slug=active_profile['slug']) }}" class="link-secondary">{{ request.url_root.rstrip('/') }}{{ url_for('profile_emergency', slug=active_profile['slug']) }}</a>
+                </div>
+              {% endif %}
             </div>
           </div>
           <div class="d-flex flex-wrap gap-3 small">
+            <a href="{{ url_for('help_page') }}" class="link-secondary">Mehr Hilfe</a>
             {% if g.user and g.user['is_admin'] %}
               <a href="{{ url_for('admin') }}" class="link-secondary">Admin</a>
             {% endif %}
-            <a href="https://www.affilio.de" target="_blank" rel="noreferrer" class="link-secondary">Affilio</a>
-            <span>Impressum</span>
-            <span>Datenschutz</span>
+            <a href="https://www.afilio.de/" target="_blank" rel="noreferrer" class="link-secondary">Affilio</a>
           </div>
         </div>
       </footer>

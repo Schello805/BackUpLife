@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% block title %}Mehr Hilfe · Aeterna{% endblock %}
+{% block content %}
+  <div class="hero-panel p-4 p-lg-5 mb-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-8">
+        <p class="section-label mb-2">Mehr Hilfe</p>
+        <h1 class="display-6 fw-semibold mb-3">Weniger Suchen. Mehr Klarheit.</h1>
+        <p class="mb-0 text-white-50">In belastenden Situationen fehlt oft die Energie, sich durch Portale und Support-Seiten zu arbeiten. Hier sammeln wir hilfreiche Quellen, damit Angehörige oder Vertrauenspersonen schneller den richtigen Weg finden.</p>
+      </div>
+      <div class="col-lg-4">
+        <div class="subtle-card p-4 bg-white text-dark">
+          <div class="section-label mb-2">Hinweis</div>
+          <ul class="hint-list ps-0 mb-0">
+            <li>Links sind bewusst offiziell oder besonders praxisnah gewählt.</li>
+            <li>Bitte prüfen Sie Inhalte regelmäßig, da Anbieter Richtlinien ändern können.</li>
+            <li>Diese Seite enthält keine sensiblen Daten und kann geteilt werden.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-xl-6">
+      <div class="page-shell p-4 p-lg-5 h-100">
+        <div class="section-label mb-2">Grundlagen</div>
+        <h2 class="h4 mb-3">Checklisten & Anleitungen</h2>
+        <div class="vstack gap-3">
+          {% for link in general_links %}
+            <div class="subtle-card p-3">
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="fw-semibold">{{ link.title }}</div>
+                  <div class="small text-secondary">{{ link.description }}</div>
+                </div>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ link.url }}" target="_blank" rel="noreferrer">Öffnen</a>
+              </div>
+            </div>
+          {% else %}
+            <div class="empty-state p-4 text-center text-secondary">Noch keine Links hinterlegt.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-6">
+      <div class="page-shell p-4 p-lg-5 h-100">
+        <div class="section-label mb-2">Anbieter</div>
+        <h2 class="h4 mb-3">Digitale Erben, Nachlasskontakte & Konto-Regelungen</h2>
+        <p class="text-secondary small mb-4">Viele große Anbieter bieten inzwischen eigene Funktionen für den digitalen Nachlass. Am besten legt der Ersteller diese Einstellungen aktiv im jeweiligen Konto fest und hinterlegt hier den Hinweis dazu.</p>
+        <div class="vstack gap-3">
+          {% for item in provider_links %}
+            <div class="subtle-card p-3">
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="fw-semibold">{{ item.provider }} · {{ item.title }}</div>
+                  <div class="small text-secondary">{{ item.description }}</div>
+                </div>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ item.url }}" target="_blank" rel="noreferrer">Öffnen</a>
+              </div>
+            </div>
+          {% else %}
+            <div class="empty-state p-4 text-center text-secondary">Noch keine Anbieter-Links hinterlegt.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
