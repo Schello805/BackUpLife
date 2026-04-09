@@ -89,6 +89,15 @@ sudo bash install_debian13.sh
 
 Das Skript installiert Python, venv, Gunicorn, Nginx und richtet einen Systemd-Service ein. Zusätzlich wird automatisch eine `.env` unter `/opt/backuplife/.env` erzeugt (inkl. zufälliger Secrets), sodass die Instanz direkt startklar ist.
 
+## Update (Debian 13)
+
+```bash
+git pull --ff-only
+sudo bash update_debian13.sh
+```
+
+Das Update-Skript deployed den Code nach `/opt/backuplife` (ohne `instance/` zu überschreiben), aktualisiert Dependencies und startet den Service neu.
+
 ## Repository-Dokumente
 
 - [LICENSE](./LICENSE)
