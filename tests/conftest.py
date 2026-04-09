@@ -21,6 +21,8 @@ def app_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("BACKUPLIFE_UPLOAD_DIR", str(tmp_path / "uploads"))
     monkeypatch.setenv("HOST", "127.0.0.1")
     monkeypatch.setenv("PORT", "8001")
+    # Tests should not be forced through admin 2FA unless a test explicitly enables it.
+    monkeypatch.setenv("BACKUPLIFE_ENFORCE_ADMIN_2FA", "0")
 
     # Reload the module so its global create_app_instance uses our env for encryption/db paths.
     if "app" in sys.modules:

@@ -194,6 +194,44 @@ def test_rate_limit_login_blocks(app, app_module, monkeypatch):
             assert resp.status_code == 429
 
 
+def test_login_lockout_escalates(app, app_module, monkeypatch):
+    # Ensure 5 failures trigger a lockout response (429).
+    with app.test_request_context("/setup"):
+        from flask import g
+
+        g.db = app_module.get_db(app)
+        app_module.init_db(app)
+        user_id = app_module.create_user_with_profile(
+            "Admin",
+            "lock@example.com",
+            "very-secure-password",
+            "admin",
+            None,
+        )
+        g.db.execute("UPDATE users SET email_verified_at = ? WHERE id = ?", (app_module.utcnow(), user_id))
+        g.db.commit()
+        g.db.close()
+
+    # Avoid IP-based rate limit interfering.
+    monkeypatch.setattr(app_module, "DEFAULT_RATE_LIMIT_LOGIN", 999)
+
+    client = app.test_client()
+    for i in range(6):
+        client.get("/login")
+        with client.session_transaction() as sess:
+            csrf = sess.get("_csrf_token")
+        resp = client.post(
+            "/login",
+            data={"csrf_token": csrf, "email": "lock@example.com", "password": "wrong"},
+            headers={"X-Forwarded-For": "203.0.113.101"},
+            follow_redirects=False,
+        )
+        if i < 5:
+            assert resp.status_code == 200
+        else:
+            assert resp.status_code == 429
+
+
 def test_route_crawl_logged_in_creator(app, logged_in_creator, creator_user):
     slug = creator_user["slug"]
     paths = [
@@ -357,3 +395,41 @@ def test_login_requires_totp_when_enabled(app, app_module):
         follow_redirects=False,
     )
     assert resp2.status_code in (302, 303)
+
+
+def test_admin_requires_2fa_when_enforced(app, app_module, monkeypatch):
+    monkeypatch.setenv("BACKUPLIFE_ENFORCE_ADMIN_2FA", "1")
+    with app.test_request_context("/setup"):
+        from flask import g
+
+        g.db = app_module.get_db(app)
+        app_module.init_db(app)
+        user_id = app_module.create_user_with_profile(
+            "Admin",
+            "admin-no2fa@example.com",
+            "very-secure-password",
+            "admin",
+            None,
+        )
+        g.db.execute("UPDATE users SET email_verified_at = ? WHERE id = ?", (app_module.utcnow(), user_id))
+        g.db.commit()
+        g.db.close()
+
+    client = app.test_client()
+    client.get("/login")
+    with client.session_transaction() as sess:
+        csrf = sess.get("_csrf_token")
+    resp = client.post(
+        "/login",
+        data={"csrf_token": csrf, "email": "admin-no2fa@example.com", "password": "very-secure-password"},
+        headers={"X-Forwarded-For": "203.0.113.102"},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+
+    # Any page other than /konto should redirect to /konto until 2FA is enabled.
+    blocked = client.get("/dashboard", follow_redirects=False)
+    assert blocked.status_code in (302, 303)
+    assert "/konto" in blocked.headers.get("Location", "")
+    allowed = client.get("/konto", follow_redirects=False)
+    assert allowed.status_code == 200

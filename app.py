@@ -65,6 +65,7 @@ DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
 DEFAULT_RATE_LIMIT_LOGIN = 20
 DEFAULT_RATE_LIMIT_REGISTER = 10
 DEFAULT_RATE_LIMIT_FORGOT = 10
+DEFAULT_SESSION_LIFETIME_MINUTES = 120
 
 LOCAL_TZ = timezone.utc
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -624,6 +625,71 @@ def rate_limit_check(action: str, key: str, limit: int, window_seconds: int) -> 
     return count <= limit
 
 
+def throttle_key(email: str, ip: str) -> str:
+    return f"{normalize_email(email)}|{ip.strip()}"
+
+
+def get_lockout_seconds_for_fail_count(fail_count: int) -> int:
+    # Desired policy: after 5 failures lock 5 min, after 10 failures lock 15 min, after 15 failures lock 30 min.
+    if fail_count >= 15:
+        return 30 * 60
+    if fail_count >= 10:
+        return 15 * 60
+    if fail_count >= 5:
+        return 5 * 60
+    return 0
+
+
+def auth_throttle_check(email: str, ip: str) -> tuple[bool, int]:
+    key = throttle_key(email, ip)
+    row = g.db.execute("SELECT fail_count, locked_until FROM auth_throttle WHERE key = ?", (key,)).fetchone()
+    if not row:
+        return True, 0
+    locked_until = (row["locked_until"] or "").strip()
+    if not locked_until:
+        return True, 0
+    try:
+        dt = datetime.fromisoformat(locked_until)
+    except ValueError:
+        return True, 0
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    if dt <= now:
+        return True, 0
+    return False, int((dt - now).total_seconds())
+
+
+def auth_throttle_register_failure(email: str, ip: str) -> int:
+    key = throttle_key(email, ip)
+    now = utcnow()
+    row = g.db.execute("SELECT fail_count FROM auth_throttle WHERE key = ?", (key,)).fetchone()
+    fail_count = int(row["fail_count"] or 0) + 1 if row else 1
+    lock_seconds = get_lockout_seconds_for_fail_count(fail_count)
+    locked_until = ""
+    if lock_seconds:
+        locked_until = (datetime.now(timezone.utc) + timedelta(seconds=lock_seconds)).isoformat()
+    g.db.execute(
+        """
+        INSERT INTO auth_throttle(key, fail_count, locked_until, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET
+          fail_count = excluded.fail_count,
+          locked_until = excluded.locked_until,
+          updated_at = excluded.updated_at
+        """,
+        (key, fail_count, locked_until, now),
+    )
+    g.db.commit()
+    return fail_count
+
+
+def auth_throttle_clear(email: str, ip: str) -> None:
+    key = throttle_key(email, ip)
+    g.db.execute("DELETE FROM auth_throttle WHERE key = ?", (key,))
+    g.db.commit()
+
+
 
 def create_app() -> Flask:
     load_env_file()
@@ -643,6 +709,12 @@ def create_app() -> Flask:
     )
     app.config["HOST"] = os.environ.get("HOST", "127.0.0.1")
     app.config["PORT"] = int(os.environ.get("PORT", "8000"))
+    try:
+        lifetime = int(os.environ.get("BACKUPLIFE_SESSION_LIFETIME_MINUTES", str(DEFAULT_SESSION_LIFETIME_MINUTES)))
+    except ValueError:
+        lifetime = DEFAULT_SESSION_LIFETIME_MINUTES
+    lifetime = max(10, min(lifetime, 24 * 60))
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=lifetime)
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_SIZE
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -674,6 +746,9 @@ def create_app() -> Flask:
         g.db = get_db(app)
         g.system_initialized = is_system_initialized()
         g.user = get_current_user()
+        if g.user:
+            # Sliding expiration: any activity keeps the session alive up to PERMANENT_SESSION_LIFETIME.
+            session.permanent = True
         try:
             g.app_timezone_name = get_app_timezone_name()
         except sqlite3.Error:
@@ -710,6 +785,26 @@ def create_app() -> Flask:
             and not (request.endpoint or "").startswith("static")
         ):
             return redirect(url_for("setup"))
+
+        # Enforce that the (single) admin uses 2FA. Admin can still reach /konto to enable it.
+        enforce_admin_2fa = os.environ.get("BACKUPLIFE_ENFORCE_ADMIN_2FA", "1") == "1"
+        if enforce_admin_2fa and g.user and g.user["is_admin"] and not g.user["totp_enabled"]:
+            allow_admin_endpoints = {
+                "account_settings",
+                "logout",
+                "static",
+                "logo_asset",
+                "manifest_webmanifest",
+                "service_worker",
+                "version_info",
+            }
+            if request.endpoint not in allow_admin_endpoints:
+                push_toast(
+                    "Aus Sicherheitsgründen muss der Admin eine 2-Faktor-Authentifizierung aktivieren, bevor weitere Bereiche genutzt werden können.",
+                    "warning",
+                    "2FA erforderlich",
+                )
+                return redirect(url_for("account_settings"))
 
         # CSRF protection for state-changing requests.
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not request.is_json:
@@ -881,6 +976,12 @@ def init_db(app: Flask) -> None:
         window_start INTEGER NOT NULL,
         updated_at TEXT NOT NULL,
         PRIMARY KEY(action, key)
+    );
+    CREATE TABLE IF NOT EXISTS auth_throttle (
+        key TEXT PRIMARY KEY,
+        fail_count INTEGER NOT NULL DEFAULT 0,
+        locked_until TEXT,
+        updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS activity_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1986,11 +2087,21 @@ self.addEventListener('fetch', (event) => {
                 return render_template("login.html", target_slug=target_slug), 429
             email = normalize_email(request.form.get("email", ""))
             password = request.form.get("password", "")
+            allowed, retry_after = auth_throttle_check(email, ip or "unknown")
+            if not allowed:
+                minutes = max(1, int(round(retry_after / 60)))
+                push_toast(
+                    f"Zu viele Fehlversuche für diese Anmeldung. Bitte warten Sie {minutes} Minute(n) und versuchen Sie es erneut.",
+                    "danger",
+                    "Kurz gesperrt",
+                )
+                return render_template("login.html", target_slug=target_slug), 429
             user = g.db.execute(
                 "SELECT * FROM users WHERE lower(email) = ? AND active = 1", (email,)
             ).fetchone()
             if not user or not verify_password(password, user["password_hash"]):
                 log_event("login_failed", "auth", f"Fehlgeschlagener Login für {email}")
+                auth_throttle_register_failure(email, ip or "unknown")
                 push_toast("Bitte prüfen Sie E-Mail-Adresse und Passwort.", "danger", "Anmeldung fehlgeschlagen")
             elif get_require_email_verification() and not user["email_verified_at"]:
                 log_event("login_blocked_unverified", "auth", f"Login blockiert (E-Mail unbestätigt) für {email}")
@@ -2001,6 +2112,7 @@ self.addEventListener('fetch', (event) => {
                 )
                 return redirect(url_for("resend_verification", email=email))
             else:
+                auth_throttle_clear(email, ip or "unknown")
                 session.clear()
                 if user["totp_enabled"]:
                     session["pre_2fa_user_id"] = user["id"]
