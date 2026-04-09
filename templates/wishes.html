@@ -22,6 +22,7 @@
 	      </div>
 	    </div>
 	    <form method="post" class="row g-4" novalidate>
+        {{ csrf_input() }}
       <div class="col-lg-6">
         <label class="form-label">Persönliche Nachricht</label>
         <textarea class="form-control" name="farewell_message" rows="8" maxlength="4000" placeholder="Zum Beispiel: Persönliche Worte an die Familie, Dank, letzte Nachricht oder Hinweise, die Ihnen besonders wichtig sind." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['farewell_message'] }}</textarea>
@@ -68,7 +69,7 @@
       </div>
       <div class="col-12">
         <label class="form-label">Externe Links</label>
-        <textarea class="form-control" name="external_links" rows="4" maxlength="4000" placeholder="Zum Beispiel: Affilio, Vorsorgeportale oder andere wichtige externe Seiten mit Bezug zu Ihrem Nachlass." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['external_links'] }}</textarea>
+        <textarea class="form-control" name="external_links" rows="4" maxlength="4000" placeholder="Zum Beispiel: Afilio, Vorsorgeportale oder andere wichtige externe Seiten mit Bezug zu Ihrem Nachlass." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['external_links'] }}</textarea>
       </div>
       {% if g.user['id'] == profile['owner_user_id'] %}
         <div class="col-12 d-flex flex-wrap justify-content-end gap-2">

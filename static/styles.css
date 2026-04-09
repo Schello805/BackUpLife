@@ -13,6 +13,10 @@
   --aeterna-warning: #8c6433;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 body {
   color: var(--aeterna-ink);
   background:

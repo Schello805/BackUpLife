@@ -12,6 +12,7 @@
     </div>
     {% set values = form_values if form_values else record %}
     <form method="post" class="row g-3" novalidate>
+      {{ csrf_input() }}
       <div class="col-md-6">
         <label class="form-label">Titel</label>
         <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>

@@ -44,6 +44,7 @@
               <div class="d-flex flex-wrap gap-2">
                 {% if category_status.state == 'na' %}
                   <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                    {{ csrf_input() }}
                     <input type="hidden" name="action" value="applicable">
                     <input type="hidden" name="next" value="{{ request.full_path }}">
                     <button class="btn btn-outline-secondary btn-sm">Wieder relevant</button>
@@ -51,18 +52,21 @@
                 {% else %}
                   {% if category_status.is_complete %}
                     <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                      {{ csrf_input() }}
                       <input type="hidden" name="action" value="open">
                       <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button class="btn btn-outline-secondary btn-sm">Als offen</button>
                     </form>
                   {% else %}
                     <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                      {{ csrf_input() }}
                       <input type="hidden" name="action" value="complete">
                       <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button class="btn btn-outline-secondary btn-sm">Als fertig</button>
                     </form>
                   {% endif %}
                   <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
+                    {{ csrf_input() }}
                     <input type="hidden" name="action" value="na">
                     <input type="hidden" name="next" value="{{ request.full_path }}">
                     <button class="btn btn-outline-secondary btn-sm">Nicht zutreffend</button>
@@ -141,6 +145,7 @@
                       {% if g.user['id'] == profile['owner_user_id'] %}
                         <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('record_edit', slug=profile['slug'], category_key=category_key, record_id=record['id']) }}">Bearbeiten</a>
                         <form method="post" action="{{ url_for('record_delete', slug=profile['slug'], category_key=category_key, record_id=record['id']) }}" class="d-inline">
+                          {{ csrf_input() }}
                           <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Eintrag wirklich löschen?')">Löschen</button>
                         </form>
                       {% endif %}
@@ -161,6 +166,7 @@
         <h2 class="h4 mb-3">Dateien & Uploads</h2>
         {% if g.user['id'] == profile['owner_user_id'] %}
           <form method="post" action="{{ url_for('upload_document', slug=profile['slug']) }}" enctype="multipart/form-data" class="vstack gap-3 mb-4">
+            {{ csrf_input() }}
             <input type="hidden" name="category_key" value="{{ category_key }}">
             <div>
               <label class="form-label">Dokumenttitel</label>
@@ -190,6 +196,7 @@
                 <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_document', slug=profile['slug'], document_id=document['id']) }}">Download</a>
                 {% if g.user['id'] == profile['owner_user_id'] %}
                   <form method="post" action="{{ url_for('delete_document', slug=profile['slug'], document_id=document['id']) }}">
+                    {{ csrf_input() }}
                     <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Dokument wirklich löschen?')">Löschen</button>
                   </form>
                 {% endif %}

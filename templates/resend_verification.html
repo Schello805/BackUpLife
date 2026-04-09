@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block title %}E-Mail bestätigen · BackUpLife{% endblock %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="page-shell p-4 p-lg-5">
+        <p class="section-label mb-2">E-Mail-Bestätigung</p>
+        <h1 class="h3 mb-3">Bestätigungslink erneut senden</h1>
+        <p class="text-secondary mb-4">Damit Ihr Konto wirklich Ihnen gehört, bitten wir um eine kurze Bestätigung. Geben Sie Ihre E-Mail-Adresse ein, dann senden wir den Link erneut.</p>
+        <form method="post" class="vstack gap-3" novalidate>
+          {{ csrf_input() }}
+          <div>
+            <label class="form-label">E-Mail-Adresse</label>
+            <input type="email" class="form-control" name="email" value="{{ email or '' }}" required>
+          </div>
+          <button class="btn btn-primary">Link senden</button>
+        </form>
+        <div class="mt-4 small">
+          <a href="{{ url_for('login') }}">Zurück zum Login</a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

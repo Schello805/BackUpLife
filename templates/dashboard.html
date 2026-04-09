@@ -67,12 +67,12 @@
                   <div class="progress" role="progressbar" aria-label="Ausfüllstand" aria-valuenow="{{ entry.completion.percent }}" aria-valuemin="0" aria-valuemax="100" style="height: 0.75rem;">
                     <div class="progress-bar" style="width: {{ entry.completion.percent }}%; background: linear-gradient(135deg, var(--aeterna-accent), var(--aeterna-accent-dark));"></div>
                   </div>
-                  <div class="small text-secondary mt-2">
-                    Fertig: {{ entry.completion.completed_total }}/{{ entry.completion.applicable_total }}
-                    {% if entry.completion.started_total %}
-                      · Begonnen: {{ entry.completion.started_total }}
-                    {% endif %}
-                    {% if entry.completion.not_applicable_total %}
+	                  <div class="small text-secondary mt-2">
+	                    Erledigt: {{ entry.completion.done_total }}/{{ entry.completion.total }}
+	                    {% if entry.completion.started_total %}
+	                      · Begonnen: {{ entry.completion.started_total }}
+	                    {% endif %}
+	                    {% if entry.completion.not_applicable_total %}
                       · Nicht zutreffend: {{ entry.completion.not_applicable_total }}
                     {% endif %}
                   </div>

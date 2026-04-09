@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+
+{% block title %}BackUpLife · Digitale Nachlass App{% endblock %}
+{% block meta_robots %}index, follow{% endblock %}
+{% block meta_description %}BackUpLife ist eine kostenlose App (WebApp) für digitalen Nachlass: Zugangsdaten, Unterlagen, Geräte, Verträge und letzte Wünsche sicher strukturiert hinterlassen. Mit Freigaben, Notfall-Link und Audit-Logs.{% endblock %}
+
+{% block head_extra %}
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "BackUpLife",
+      "applicationCategory": "LifestyleApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "de-DE",
+      "description": "{{ self.meta_description()|striptags|trim }}",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      }
+    }
+  </script>
+{% endblock %}
+
+{% block content %}
+  <div class="hero-panel p-4 p-lg-5 mb-4">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <div class="section-label mb-2">BACKUPLIFE</div>
+        <h1 class="display-5 fw-semibold mb-3">Alles Wichtige an einem Ort. Für alle Fälle.</h1>
+        <p class="lead text-white-50 mb-4">
+          Wenn es plötzlich schnell gehen muss, helfen klare Informationen. BackUpLife ist kein Testament
+          und ersetzt keine rechtliche Beratung, aber es gibt Angehörigen Orientierung: Zugangsdaten, Unterlagen,
+          Geräte, Verträge, Versicherungen, Heimnetz und persönliche Worte.
+        </p>
+        <div class="info-chip mb-4" style="background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); color: rgba(255,255,255,0.92);">
+          Kostenlos · Open Source · Fokus: Digitaler Nachlass
+        </div>
+        <div class="d-flex flex-column flex-sm-row gap-2">
+          <a class="btn btn-primary btn-lg" href="{{ url_for('login') }}">Anmelden</a>
+          <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('register') }}">Registrieren</a>
+          <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('help_page') }}">Mehr Hilfe</a>
+        </div>
+        <div class="small text-white-50 mt-3">
+          Hinweis: Nachlass- und Notfall-URLs sind absichtlich nicht für Suchmaschinen gedacht und werden mit <strong>noindex</strong> gekennzeichnet.
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="subtle-card p-4 text-dark">
+          <div class="fw-semibold mb-2">Was BackUpLife besonders macht</div>
+          <ul class="mb-0 text-secondary">
+            <li>Persönliche Notfall-URL je Ersteller, ideal zum Hinterlegen im Portemonnaie</li>
+            <li>Freigaben für Leser bis auf Kategorie-Ebene</li>
+            <li>Audit-Logs: nachvollziehbar, wer wann worauf zugegriffen hat</li>
+            <li>Druckansicht im neuen Tab und Export-Workflow für Unterlagen</li>
+            <li>Seriöses Design, mobile optimiert, rein deutschsprachig</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+      <div class="page-shell p-4 h-100">
+        <div class="section-label mb-2">1. Struktur</div>
+        <h2 class="h5 mb-2">Digitaler Nachlass</h2>
+        <p class="text-secondary mb-0">
+          Onlinekonten, Websites, Geräte und Datenträger, Verträge, Versicherungen, Dokumente, Unterlagen und Notgroschen,
+          Heimnetz und Smarthome. Alles mit klarer Kategorisierung.
+        </p>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="page-shell p-4 h-100">
+        <div class="section-label mb-2">2. Persönlichkeit</div>
+        <h2 class="h5 mb-2">Letzte Wünsche</h2>
+        <p class="text-secondary mb-0">
+          Worte, Hinweise, Verteilungswünsche und eine Bucket List als Checkliste. Vorsichtig formuliert: ein persönlicher
+          Leitfaden, kein rechtlich bindendes Dokument.
+        </p>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="page-shell p-4 h-100">
+        <div class="section-label mb-2">3. Sicherheit</div>
+        <h2 class="h5 mb-2">Zugriff und Transparenz</h2>
+        <p class="text-secondary mb-0">
+          Leser sehen nur, was explizit freigegeben ist. Ersteller verwalten ihren Nachlass getrennt. Admin-Einstellungen
+          (z. B. Basis-URL, SMTP, Zeitzone) bleiben beim Admin.
+        </p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

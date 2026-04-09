@@ -7,10 +7,11 @@
         <p class="section-label mb-2">Digitaler Nachlass</p>
         <h1 class="h3 mb-2">{{ profile['title'] }}</h1>
         <div class="d-flex flex-wrap gap-2">
-          <span class="info-chip">Eigentümer: {{ profile['owner_name'] }}</span>
-          <span class="info-chip">Notfall-URL: /notfall/{{ profile['slug'] }}</span>
           {% if completion %}
-            <span class="info-chip">Ausfüllstand: {{ completion.percent }}% ({{ completion.completed_total }}/{{ completion.applicable_total }})</span>
+            <span class="info-chip">Ausfüllstand: {{ completion.percent }}% ({{ completion.done_total }}/{{ completion.total }})</span>
+          {% endif %}
+          {% if storage %}
+            <span class="info-chip">Speicher: {{ format_bytes(storage.used_bytes) }} von {{ format_bytes(storage.limit_bytes) }}</span>
           {% endif %}
         </div>
       </div>
@@ -48,6 +49,7 @@
 		                    {% if category.status_state == 'na' %}
 		                      <li>
 		                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                              {{ csrf_input() }}
 		                          <input type="hidden" name="action" value="applicable">
 		                          <input type="hidden" name="next" value="{{ request.full_path }}">
 		                          <button class="dropdown-item" type="submit">Wieder relevant</button>
@@ -57,6 +59,7 @@
 		                      {% if category.is_complete %}
 		                        <li>
 		                          <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                                {{ csrf_input() }}
 		                            <input type="hidden" name="action" value="open">
 		                            <input type="hidden" name="next" value="{{ request.full_path }}">
 		                            <button class="dropdown-item" type="submit">Als offen markieren</button>
@@ -65,6 +68,7 @@
 		                      {% else %}
 		                        <li>
 		                          <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                                {{ csrf_input() }}
 		                            <input type="hidden" name="action" value="complete">
 		                            <input type="hidden" name="next" value="{{ request.full_path }}">
 		                            <button class="dropdown-item" type="submit">Als fertig markieren</button>
@@ -74,6 +78,7 @@
 		                      <li><hr class="dropdown-divider"></li>
 		                      <li>
 		                        <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
+                              {{ csrf_input() }}
 		                          <input type="hidden" name="action" value="na">
 		                          <input type="hidden" name="next" value="{{ request.full_path }}">
 		                          <button class="dropdown-item" type="submit">Nicht zutreffend</button>

@@ -21,6 +21,7 @@
         <div class="section-label mb-2">E-Mail</div>
         <h2 class="h4 mb-3">E-Mail-Adresse ändern</h2>
         <form method="post" class="vstack gap-3" novalidate>
+          {{ csrf_input() }}
           <input type="hidden" name="form_id" value="email">
           <div>
             <label class="form-label">Neue E-Mail-Adresse</label>
@@ -43,6 +44,7 @@
         <div class="section-label mb-2">Passwort</div>
         <h2 class="h4 mb-3">Passwort ändern</h2>
         <form method="post" class="vstack gap-3" novalidate>
+          {{ csrf_input() }}
           <input type="hidden" name="form_id" value="password">
           <div>
             <label class="form-label">Aktuelles Passwort</label>
@@ -65,4 +67,3 @@
     </div>
   </div>
 {% endblock %}
-

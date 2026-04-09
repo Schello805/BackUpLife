@@ -26,6 +26,7 @@
           <h2 class="h3 mb-3">Ein neues Benutzerkonto anlegen</h2>
           {% set values = form_values if form_values else {} %}
           <form method="post" class="vstack gap-3" novalidate>
+            {{ csrf_input() }}
             <div>
               <label class="form-label">Name</label>
               <input class="form-control" name="display_name" minlength="2" value="{{ values.get('display_name', '') }}" required>

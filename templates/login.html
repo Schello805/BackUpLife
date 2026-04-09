@@ -29,6 +29,7 @@
             <div class="info-chip mb-3">Ziel-Nachlass: {{ target_slug }}</div>
           {% endif %}
           <form method="post" class="vstack gap-3" novalidate>
+            {{ csrf_input() }}
             <div>
               <label class="form-label">E-Mail-Adresse</label>
               <input type="email" class="form-control" name="email" autocomplete="username" required>
@@ -44,7 +45,6 @@
           </div>
           <div class="mt-4 d-flex flex-wrap justify-content-between gap-2 small">
             <a href="{{ url_for('forgot_password') }}">Passwort vergessen?</a>
-            <span class="text-secondary">Nur Deutsch · Responsiv mit Bootstrap</span>
           </div>
         </div>
       </div>

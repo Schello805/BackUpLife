@@ -4,26 +4,44 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}BackUpLife{% endblock %}</title>
+    {% set public_base = g.public_base_url if g.public_base_url else request.url_root.rstrip('/') %}
+    <meta name="description" content="{% block meta_description %}BackUpLife hilft dabei, wichtige Informationen geordnet an einem Ort zu hinterlassen: Zugangsdaten, Unterlagen, Verträge, Geräte, Heimnetz und letzte Wünsche. Für alle Fälle.{% endblock %}">
+    <meta name="robots" content="{% block meta_robots %}noindex, nofollow{% endblock %}">
+    <link rel="canonical" href="{% block canonical_url %}{{ public_base }}{{ request.path }}{% endblock %}">
+    <meta name="theme-color" content="#103654">
+
+    <meta property="og:site_name" content="BackUpLife">
+    <meta property="og:title" content="{% block og_title %}{{ self.title()|striptags|trim }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ self.meta_description()|striptags|trim }}{% endblock %}">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ self.canonical_url()|trim }}{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{{ public_base }}{{ url_for('logo_asset') }}{% endblock %}">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ self.og_title()|striptags|trim }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ self.og_description()|striptags|trim }}{% endblock %}">
+    <meta name="twitter:image" content="{% block twitter_image %}{{ self.og_image()|trim }}{% endblock %}">
     <link rel="icon" type="image/png" href="{{ url_for('logo_asset') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    {% block head_extra %}{% endblock %}
   </head>
   <body>
     <div class="app-shell">
-      {% if g.user %}
-        <nav class="navbar navbar-expand-lg topbar no-print">
-          <div class="container py-3">
-            <a class="brand-lockup" href="{{ url_for('dashboard') }}">
-              <img src="{{ url_for('logo_asset') }}" alt="BackUpLife Logo" class="brand-logo">
-              <div class="brand-wordmark">
-                <strong>BackUpLife</strong>
-                <span>Alles Wichtige an einem Ort. Für alle Fälle.</span>
-              </div>
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-              <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="mainNav">
+      <nav class="navbar navbar-expand-lg topbar no-print">
+        <div class="container py-3">
+          <a class="brand-lockup" href="{{ url_for('dashboard') if g.user else url_for('index') }}">
+            <img src="{{ url_for('logo_asset') }}" alt="BackUpLife Logo" class="brand-logo">
+            <div class="brand-wordmark">
+              <strong>BackUpLife</strong>
+              <span>Alles Wichtige an einem Ort. Für alle Fälle.</span>
+            </div>
+          </a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="mainNav">
+            {% if g.user %}
               <ul class="navbar-nav mx-auto mb-2 mb-lg-0">
                 <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">Dashboard</a></li>
                 {% if active_profile %}
@@ -32,7 +50,7 @@
                 {% endif %}
                 <li class="nav-item"><a class="nav-link {% if request.endpoint == 'management' %}active{% endif %}" href="{{ url_for('management') }}">Verwaltung</a></li>
               </ul>
-	              <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2 gap-lg-3">
+              <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2 gap-lg-3">
                 {% if visible_profiles|length > 1 %}
                   <div class="dropdown">
                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
@@ -57,10 +75,17 @@
                   </ul>
                 </div>
               </div>
-            </div>
+            {% else %}
+              <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Start</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.endpoint == 'help_page' %}active{% endif %}" href="{{ url_for('help_page') }}">Mehr Hilfe</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.endpoint == 'login' %}active{% endif %}" href="{{ url_for('login') }}">Login</a></li>
+                <li class="nav-item"><a class="nav-link {% if request.endpoint == 'register' %}active{% endif %}" href="{{ url_for('register') }}">Registrieren</a></li>
+              </ul>
+            {% endif %}
           </div>
-        </nav>
-	      {% endif %}
+        </div>
+      </nav>
 
       <div class="toast-container position-fixed top-0 end-0 p-3 no-print">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -108,7 +133,7 @@
             {% if g.user and g.user['is_admin'] %}
               <a href="{{ url_for('admin') }}" class="link-secondary">Admin</a>
             {% endif %}
-            <a href="https://www.afilio.de/" target="_blank" rel="noreferrer" class="link-secondary">Affilio</a>
+            <a href="https://www.afilio.de/" target="_blank" rel="noreferrer" class="link-secondary">Afilio</a>
           </div>
         </div>
       </footer>

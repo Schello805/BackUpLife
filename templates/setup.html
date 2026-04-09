@@ -25,6 +25,7 @@
           <p class="section-label mb-2">Los geht's</p>
           <h2 class="h3 mb-3">Ihr erstes Konto anlegen</h2>
           <form method="post" class="vstack gap-3" novalidate>
+            {{ csrf_input() }}
             <div>
               <label class="form-label">Ihr Name</label>
               <input class="form-control" name="display_name" minlength="2" required>

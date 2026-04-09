@@ -21,6 +21,7 @@
       <div class="section-label mb-2">System</div>
       <h2 class="h4 mb-3">Zeit & Links</h2>
       <form method="post" class="row g-3" novalidate>
+        {{ csrf_input() }}
         <input type="hidden" name="form_id" value="system">
         <div class="col-md-6">
           <label class="form-label">Zeitzone</label>
@@ -45,9 +46,50 @@
     </div>
 
     <div class="subtle-card p-4 mb-4">
+      <div class="section-label mb-2">Sicherheit</div>
+      <h2 class="h4 mb-3">Registrierung, Verifikation und Limits</h2>
+      <form method="post" class="row g-3" novalidate>
+        {{ csrf_input() }}
+        <input type="hidden" name="form_id" value="security">
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="allow_registration" id="allow_registration" {% if app_settings and app_settings['allow_registration'] %}checked{% endif %}>
+            <label class="form-check-label" for="allow_registration">Öffentliche Registrierung erlauben</label>
+          </div>
+          <div class="form-text">Wenn deaktiviert, kann sich niemand neu registrieren. Bestehende Nutzer bleiben unberührt.</div>
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="require_email_verification" id="require_email_verification" {% if not app_settings or app_settings['require_email_verification'] %}checked{% endif %}>
+            <label class="form-check-label" for="require_email_verification">E-Mail-Verifikation vor Login erzwingen</label>
+          </div>
+          <div class="form-text">Empfohlen für öffentliche Instanzen. Erfordert SMTP-Konfiguration.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Speicherlimit pro Nachlass (MB)</label>
+          <input class="form-control" name="max_profile_storage_mb" type="number" min="10" max="1024" value="{{ app_settings['max_profile_storage_mb'] if app_settings else 100 }}">
+          <div class="form-text">Gilt für Dokument-Uploads. Passwörter/Einträge liegen in der Datenbank und zählen nicht als Upload-Speicher.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Backup-Passphrase (optional)</label>
+          <input class="form-control" name="backup_password" type="password" placeholder="leer lassen = unverändert">
+          <div class="form-text">Wenn gesetzt, werden Backups mit dieser Passphrase verschlüsselt. Ohne Passphrase nutzen Backups den App-Key.</div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="backup_password_clear" id="backup_password_clear">
+            <label class="form-check-label" for="backup_password_clear">Passphrase entfernen</label>
+          </div>
+        </div>
+        <div class="col-12 d-flex justify-content-end">
+          <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="subtle-card p-4 mb-4">
       <div class="section-label mb-2">SMTP</div>
       <h2 class="h4 mb-3">E-Mails</h2>
       <form method="post" class="row g-3" novalidate>
+        {{ csrf_input() }}
         <input type="hidden" name="form_id" value="smtp">
         <div class="col-md-6">
           <label class="form-label">Host</label>
@@ -94,7 +136,7 @@
     <div class="subtle-card p-4">
       <div class="section-label mb-2">Backup</div>
       <h2 class="h4 mb-3">ZIP herunterladen</h2>
-      <p class="text-secondary small mb-3">Enthält Datenbank und alle Uploads. Zugangsdaten bleiben verschlüsselt gespeichert. Für ein Restore wird derselbe App-Key benötigt.</p>
+      <p class="text-secondary small mb-3">Enthält Datenbank und alle Uploads. Das Backup wird verschlüsselt ausgeliefert (<code>.zip.enc</code>) und benötigt zum Entschlüsseln den App-Key oder die definierte Backup-Passphrase.</p>
       <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_backup_zip') }}">Backup-ZIP herunterladen</a>
     </div>
   </div>

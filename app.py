@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import io
 import hashlib
 import hmac
@@ -20,7 +21,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from cryptography.fernet import Fernet, InvalidToken
 from flask import (
     Flask,
+    Response,
     abort,
+    current_app,
     flash,
     g,
     redirect,
@@ -31,6 +34,8 @@ from flask import (
     url_for,
 )
 from flask import send_file
+from markupsafe import Markup
+from werkzeug.middleware.proxy_fix import ProxyFix
 from email.message import EmailMessage
 import smtplib
 import qrcode
@@ -41,6 +46,13 @@ BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
 DEFAULT_DB_PATH = INSTANCE_DIR / "aeterna.db"
 DEFAULT_UPLOAD_DIR = INSTANCE_DIR / "uploads"
+DEFAULT_PROFILE_STORAGE_MB = 100
+DEFAULT_REQUIRE_EMAIL_VERIFICATION = 1
+DEFAULT_ALLOW_REGISTRATION = 1
+DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
+DEFAULT_RATE_LIMIT_LOGIN = 20
+DEFAULT_RATE_LIMIT_REGISTER = 10
+DEFAULT_RATE_LIMIT_FORGOT = 10
 
 LOCAL_TZ = timezone.utc
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -239,20 +251,152 @@ def load_env_file() -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
+def get_csrf_token() -> str:
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["_csrf_token"] = token
+    return str(token)
+
+
+def csrf_input() -> Markup:
+    return Markup(f'<input type="hidden" name="csrf_token" value="{get_csrf_token()}">')
+
+
+def require_csrf() -> None:
+    session_token = session.get("_csrf_token")
+    form_token = request.form.get("csrf_token") or request.headers.get("X-CSRFToken")
+    if not session_token or not form_token or not secrets.compare_digest(str(session_token), str(form_token)):
+        abort(400)
+
+
+def is_smtp_configured(row: sqlite3.Row | None) -> bool:
+    if not row:
+        return False
+    return bool((row["host"] or "").strip() and (row["sender_email"] or "").strip())
+
+
+def get_app_settings_row() -> sqlite3.Row:
+    return g.db.execute("SELECT * FROM app_settings WHERE id = 1").fetchone()
+
+
+def get_allow_registration() -> bool:
+    try:
+        row = get_app_settings_row()
+        return bool(int(row["allow_registration"]))  # type: ignore[index]
+    except Exception:
+        return bool(DEFAULT_ALLOW_REGISTRATION)
+
+
+def get_require_email_verification() -> bool:
+    try:
+        row = get_app_settings_row()
+        return bool(int(row["require_email_verification"]))  # type: ignore[index]
+    except Exception:
+        return bool(DEFAULT_REQUIRE_EMAIL_VERIFICATION)
+
+
+def get_max_profile_storage_mb() -> int:
+    try:
+        row = get_app_settings_row()
+        value = int(row["max_profile_storage_mb"])  # type: ignore[index]
+        return max(10, min(value, 1024))
+    except Exception:
+        return DEFAULT_PROFILE_STORAGE_MB
+
+
+def get_backup_password() -> str:
+    try:
+        row = get_app_settings_row()
+        return decrypt_secret(row["backup_password_encrypted"] or "")
+    except Exception:
+        return ""
+
+
+def get_profile_storage_used_bytes(profile_id: int) -> int:
+    try:
+        row = g.db.execute(
+            "SELECT COALESCE(SUM(size_bytes), 0) AS total FROM documents WHERE profile_id = ?",
+            (profile_id,),
+        ).fetchone()
+        return int(row["total"] or 0)
+    except sqlite3.Error:
+        return 0
+
+
+def format_bytes(value: int) -> str:
+    size = float(max(0, int(value)))
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size < 1024 or unit == "GB":
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{int(value)} B"
+
+
+def rate_limit_check(action: str, key: str, limit: int, window_seconds: int) -> bool:
+    limit = max(1, int(limit))
+    window_seconds = max(10, int(window_seconds))
+    now = int(datetime.now(timezone.utc).timestamp())
+    window = now - (now % window_seconds)
+    row = g.db.execute(
+        """
+        SELECT count, window_start FROM rate_limits WHERE action = ? AND key = ?
+        """,
+        (action, key),
+    ).fetchone()
+    if not row or int(row["window_start"]) != window:
+        g.db.execute(
+            """
+            INSERT INTO rate_limits (action, key, count, window_start, updated_at)
+            VALUES (?, ?, 1, ?, ?)
+            ON CONFLICT(action, key) DO UPDATE SET
+              count = 1,
+              window_start = excluded.window_start,
+              updated_at = excluded.updated_at
+            """,
+            (action, key, window, utcnow()),
+        )
+        g.db.commit()
+        return True
+    count = int(row["count"] or 0) + 1
+    g.db.execute(
+        "UPDATE rate_limits SET count = ?, updated_at = ? WHERE action = ? AND key = ?",
+        (count, utcnow(), action, key),
+    )
+    g.db.commit()
+    return count <= limit
+
+
+
 def create_app() -> Flask:
     load_env_file()
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "development-secret")
-    app.config["APP_ENCRYPTION_KEY"] = build_fernet_key(
-        os.environ.get("AETERNA_APP_KEY", "development-app-key")
+    app_key_raw = (
+        os.environ.get("BACKUPLIFE_APP_KEY")
+        or os.environ.get("AETERNA_APP_KEY")
+        or "development-app-key"
     )
-    app.config["DB_PATH"] = Path(os.environ.get("AETERNA_DB_PATH", str(DEFAULT_DB_PATH)))
+    app.config["APP_ENCRYPTION_KEY"] = build_fernet_key(app_key_raw)
+    app.config["DB_PATH"] = Path(
+        os.environ.get("BACKUPLIFE_DB_PATH", os.environ.get("AETERNA_DB_PATH", str(DEFAULT_DB_PATH)))
+    )
     app.config["UPLOAD_DIR"] = Path(
-        os.environ.get("AETERNA_UPLOAD_DIR", str(DEFAULT_UPLOAD_DIR))
+        os.environ.get("BACKUPLIFE_UPLOAD_DIR", os.environ.get("AETERNA_UPLOAD_DIR", str(DEFAULT_UPLOAD_DIR)))
     )
     app.config["HOST"] = os.environ.get("HOST", "127.0.0.1")
     app.config["PORT"] = int(os.environ.get("PORT", "8000"))
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_SIZE
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = bool(
+        os.environ.get("BACKUPLIFE_COOKIE_SECURE") or os.environ.get("AETERNA_COOKIE_SECURE")
+    )
+    # Honor reverse-proxy headers for scheme/host/ip when explicitly enabled.
+    if os.environ.get("BACKUPLIFE_TRUST_PROXY") == "1":
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
     INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
     app.config["UPLOAD_DIR"].mkdir(parents=True, exist_ok=True)
     app.jinja_env.globals["APP_CATEGORIES"] = APP_CATEGORIES
@@ -262,6 +406,9 @@ def create_app() -> Flask:
     app.jinja_env.globals["decrypt_secret"] = decrypt_secret
     app.jinja_env.globals["LEGAL_CONTACT"] = LEGAL_CONTACT
     app.jinja_env.globals["dt_de"] = dt_de
+    app.jinja_env.globals["format_bytes"] = format_bytes
+    app.jinja_env.globals["csrf_token"] = get_csrf_token
+    app.jinja_env.globals["csrf_input"] = csrf_input
 
     @app.before_request
     def before_request() -> None:
@@ -278,8 +425,11 @@ def create_app() -> Flask:
         except sqlite3.Error:
             g.public_base_url = None
         allowed_endpoints = {
+            "index",
             "login",
             "register",
+            "verify_email",
+            "resend_verification",
             "setup",
             "static",
             "logo_asset",
@@ -289,6 +439,8 @@ def create_app() -> Flask:
             "privacy",
             "cookies_page",
             "help_page",
+            "robots_txt",
+            "sitemap_xml",
             "download_backup_zip",
         }
         if (
@@ -297,6 +449,12 @@ def create_app() -> Flask:
             and not (request.endpoint or "").startswith("static")
         ):
             return redirect(url_for("setup"))
+
+        # CSRF protection for state-changing requests.
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not request.is_json:
+            endpoint = request.endpoint or ""
+            if not endpoint.startswith("static"):
+                require_csrf()
 
     @app.teardown_request
     def teardown_request(exc: BaseException | None) -> None:
@@ -309,9 +467,9 @@ def create_app() -> Flask:
     return app
 
 
-def build_fernet_key(raw_key: str) -> str:
+def build_fernet_key(raw_key: str) -> bytes:
     digest = hashlib.sha256(raw_key.encode("utf-8")).digest()
-    return base64.urlsafe_b64encode(digest).decode("ascii")
+    return base64.urlsafe_b64encode(digest)
 
 
 def get_db(app: Flask) -> sqlite3.Connection:
@@ -425,8 +583,21 @@ def init_db(app: Flask) -> None:
         id INTEGER PRIMARY KEY CHECK (id = 1),
         timezone TEXT NOT NULL DEFAULT 'Europe/Berlin',
         public_base_url TEXT NOT NULL DEFAULT '',
+        allow_registration INTEGER NOT NULL DEFAULT 1,
+        require_email_verification INTEGER NOT NULL DEFAULT 1,
+        max_profile_storage_mb INTEGER NOT NULL DEFAULT 100,
+        backup_password_encrypted TEXT NOT NULL DEFAULT '',
         updated_by INTEGER,
         updated_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TEXT NOT NULL,
+        used_at TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -436,6 +607,14 @@ def init_db(app: Flask) -> None:
         used_at TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS rate_limits (
+        action TEXT NOT NULL,
+        key TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        window_start INTEGER NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(action, key)
     );
     CREATE TABLE IF NOT EXISTS activity_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -476,9 +655,36 @@ def init_db(app: Flask) -> None:
     if "bucket_list" not in wishes_cols:
         db.execute("ALTER TABLE wishes ADD COLUMN bucket_list TEXT NOT NULL DEFAULT ''")
 
+    user_cols = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "email_verified_at" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
+        # Existing installations: treat current users as verified to avoid lock-outs after upgrade.
+        db.execute("UPDATE users SET email_verified_at = ? WHERE email_verified_at IS NULL", (utcnow(),))
+
+    doc_cols = {row["name"] for row in db.execute("PRAGMA table_info(documents)").fetchall()}
+    if "size_bytes" not in doc_cols:
+        db.execute("ALTER TABLE documents ADD COLUMN size_bytes INTEGER NOT NULL DEFAULT 0")
+    # Best-effort backfill for existing documents (keeps storage quota accurate).
+    try:
+        rows = db.execute("SELECT id, stored_name FROM documents WHERE size_bytes = 0").fetchall()
+        for row in rows:
+            path = app.config["UPLOAD_DIR"] / row["stored_name"]
+            if path.exists() and path.is_file():
+                db.execute("UPDATE documents SET size_bytes = ? WHERE id = ?", (int(path.stat().st_size), row["id"]))
+    except Exception:
+        pass
+
     app_cols = {row["name"] for row in db.execute("PRAGMA table_info(app_settings)").fetchall()}
     if "public_base_url" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN public_base_url TEXT NOT NULL DEFAULT ''")
+    if "allow_registration" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN allow_registration INTEGER NOT NULL DEFAULT 1")
+    if "require_email_verification" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN require_email_verification INTEGER NOT NULL DEFAULT 1")
+    if "max_profile_storage_mb" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN max_profile_storage_mb INTEGER NOT NULL DEFAULT 100")
+    if "backup_password_encrypted" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN backup_password_encrypted TEXT NOT NULL DEFAULT ''")
 
     db.commit()
     db.close()
@@ -502,7 +708,8 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def get_cipher() -> Fernet:
-    return Fernet(create_app_instance.config["APP_ENCRYPTION_KEY"])
+    # Use the currently active Flask app (important for tests and any future multi-instance use).
+    return Fernet(current_app.config["APP_ENCRYPTION_KEY"])
 
 
 def encrypt_secret(value: str) -> str:
@@ -1145,6 +1352,48 @@ def send_test_or_reset_mail(
         return False, f"Versand fehlgeschlagen: {exc}"
 
 
+def issue_email_verification(user_id: int, email: str, display_name: str) -> tuple[bool, str]:
+    smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
+    if not is_smtp_configured(smtp_settings):
+        return False, "SMTP ist noch nicht vollständig eingerichtet."
+    token = secrets.token_urlsafe(32)
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=48)).replace(microsecond=0).isoformat()
+    try:
+        g.db.execute(
+            """
+            INSERT INTO email_verification_tokens (user_id, token, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, token, expires_at, utcnow()),
+        )
+        g.db.commit()
+    except sqlite3.IntegrityError:
+        return False, "Bitte versuchen Sie es erneut."
+    verify_url = build_external_url("verify_email", token=token)
+    success, message = send_test_or_reset_mail(
+        smtp_settings,
+        email,
+        "BackUpLife: Bitte E-Mail-Adresse bestätigen",
+        f"Hallo {display_name},\n\nbitte bestätigen Sie Ihre E-Mail-Adresse, um BackUpLife nutzen zu können:\n{verify_url}\n\nWenn Sie sich nicht registriert haben, ignorieren Sie diese E-Mail bitte.",
+        render_email_html(
+            "E-Mail bestätigen",
+            "Ein kurzer Schritt, damit Ihr Konto wirklich Ihnen gehört.",
+            [
+                f"Hallo {display_name},",
+                "bitte bestätigen Sie Ihre E-Mail-Adresse, damit Sie sich anmelden und Ihren Nachlassbereich sicher nutzen können.",
+                "Wenn Sie sich nicht registriert haben, können Sie diese E-Mail einfach ignorieren.",
+            ],
+            "E-Mail bestätigen",
+            verify_url,
+            "Der Bestätigungslink ist 48 Stunden gültig.",
+        ),
+    )
+    if success:
+        log_event("email_verification_sent", "auth", f"Bestätigung gesendet an {email}", user_id=user_id)
+        return True, "Bestätigungslink wurde versendet. Bitte prüfen Sie auch den Spam-Ordner."
+    return False, message
+
+
 def render_email_html(
     title: str,
     lead: str,
@@ -1208,7 +1457,47 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("setup"))
         if g.user:
             return redirect(url_for("dashboard"))
-        return redirect(url_for("login"))
+        return render_template("home.html")
+
+    @app.route("/robots.txt")
+    def robots_txt():
+        base = (g.public_base_url or request.url_root.rstrip("/")).rstrip("/")
+        lines = [
+            "User-agent: *",
+            "Allow: /",
+            "Disallow: /nachlass/",
+            "Disallow: /notfall/",
+            "Disallow: /letzte-wuensche/",
+            "Disallow: /verwaltung",
+            "Disallow: /admin",
+            f"Sitemap: {base}/sitemap.xml",
+            "",
+        ]
+        return Response("\n".join(lines), mimetype="text/plain; charset=utf-8")
+
+    @app.route("/sitemap.xml")
+    def sitemap_xml():
+        base = (g.public_base_url or request.url_root.rstrip("/")).rstrip("/")
+        urls = [
+            f"{base}/",
+            f"{base}{url_for('imprint')}",
+            f"{base}{url_for('privacy')}",
+            f"{base}{url_for('cookies_page')}",
+            f"{base}{url_for('help_page')}",
+            f"{base}{url_for('login')}",
+            f"{base}{url_for('register')}",
+        ]
+        xml_parts = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        ]
+        for url in urls:
+            xml_parts.append("  <url>")
+            xml_parts.append(f"    <loc>{html.escape(url)}</loc>")
+            xml_parts.append("  </url>")
+        xml_parts.append("</urlset>")
+        xml_parts.append("")
+        return Response("\n".join(xml_parts), mimetype="application/xml; charset=utf-8")
 
     @app.route("/branding/logo.png")
     def logo_asset():
@@ -1263,6 +1552,19 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("setup"))
         target_slug = request.args.get("target", "").strip()
         if request.method == "POST":
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            if not rate_limit_check(
+                "login",
+                ip or "unknown",
+                DEFAULT_RATE_LIMIT_LOGIN,
+                DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+            ):
+                push_toast(
+                    "Zu viele Anmeldeversuche. Bitte warten Sie kurz und versuchen Sie es erneut.",
+                    "danger",
+                    "Bitte kurz warten",
+                )
+                return render_template("login.html", target_slug=target_slug), 429
             email = normalize_email(request.form.get("email", ""))
             password = request.form.get("password", "")
             user = g.db.execute(
@@ -1271,6 +1573,14 @@ def register_routes(app: Flask) -> None:
             if not user or not verify_password(password, user["password_hash"]):
                 log_event("login_failed", "auth", f"Fehlgeschlagener Login für {email}")
                 push_toast("Bitte prüfen Sie E-Mail-Adresse und Passwort.", "danger", "Anmeldung fehlgeschlagen")
+            elif get_require_email_verification() and not user["email_verified_at"]:
+                log_event("login_blocked_unverified", "auth", f"Login blockiert (E-Mail unbestätigt) für {email}")
+                push_toast(
+                    "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Wir können Ihnen den Bestätigungslink erneut zusenden.",
+                    "danger",
+                    "E-Mail noch nicht bestätigt",
+                )
+                return redirect(url_for("resend_verification", email=email))
             else:
                 session.clear()
                 session["user_id"] = user["id"]
@@ -1289,7 +1599,23 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("setup"))
         if g.user:
             return redirect(url_for("dashboard"))
+        if not get_allow_registration():
+            push_toast("Die Registrierung ist aktuell deaktiviert.", "danger", "Registrierung nicht möglich")
+            return render_template("register.html", form_values=None), 403
         if request.method == "POST":
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            if not rate_limit_check(
+                "register",
+                ip or "unknown",
+                DEFAULT_RATE_LIMIT_REGISTER,
+                DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+            ):
+                push_toast(
+                    "Zu viele Registrierungen in kurzer Zeit. Bitte warten Sie kurz und versuchen Sie es erneut.",
+                    "danger",
+                    "Bitte kurz warten",
+                )
+                return render_template("register.html", form_values=None), 429
             errors, data = validate_user_form(request.form)
             role = data["role"]
             if role == "admin":
@@ -1300,8 +1626,17 @@ def register_routes(app: Flask) -> None:
                 for error in errors:
                     push_toast(error, "danger", "Registrierung fehlgeschlagen")
                 return render_template("register.html", form_values=data)
+            require_verification = get_require_email_verification()
+            smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
+            if require_verification and not is_smtp_configured(smtp_settings):
+                push_toast(
+                    "Registrierung ist erst möglich, wenn SMTP für Bestätigungs-E-Mails eingerichtet ist.",
+                    "danger",
+                    "SMTP fehlt",
+                )
+                return render_template("register.html", form_values=data)
             try:
-                create_user_with_profile(
+                user_id = create_user_with_profile(
                     data["display_name"],
                     data["email"],
                     data["password"],
@@ -1309,8 +1644,16 @@ def register_routes(app: Flask) -> None:
                     None,
                 )
                 g.db.commit()
+                if require_verification:
+                    ok, msg = issue_email_verification(user_id, data["email"], data["display_name"])
+                    if not ok:
+                        # Keep the public surface clean: if we cannot send the mail, remove the account.
+                        g.db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                        g.db.commit()
+                        push_toast(msg, "danger", "Registrierung fehlgeschlagen")
+                        return render_template("register.html", form_values=data)
                 push_toast(
-                    "Ihr Konto wurde angelegt. Bitte melden Sie sich jetzt an.",
+                    "Ihr Konto wurde angelegt. Bitte prüfen Sie Ihr Postfach und bestätigen Sie Ihre E-Mail-Adresse.",
                     "success",
                     "Registrierung erfolgreich",
                 )
@@ -1319,6 +1662,71 @@ def register_routes(app: Flask) -> None:
                 push_toast("Diese E-Mail-Adresse ist bereits vergeben.", "danger", "Registrierung fehlgeschlagen")
                 return render_template("register.html", form_values=data)
         return render_template("register.html", form_values=None)
+
+    @app.route("/email-bestaetigen/<token>")
+    def verify_email(token: str):
+        row = g.db.execute(
+            """
+            SELECT email_verification_tokens.*, users.email, users.display_name
+            FROM email_verification_tokens
+            JOIN users ON users.id = email_verification_tokens.user_id
+            WHERE token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row:
+            push_toast("Dieser Bestätigungslink ist ungültig.", "danger", "Bestätigung fehlgeschlagen")
+            return redirect(url_for("login"))
+        if row["used_at"]:
+            push_toast("Diese E-Mail wurde bereits bestätigt. Sie können sich jetzt anmelden.", "success", "Bereits bestätigt")
+            return redirect(url_for("login"))
+        try:
+            expires = datetime.fromisoformat(row["expires_at"])
+        except ValueError:
+            expires = datetime.now(timezone.utc) - timedelta(days=1)
+        if expires.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+            push_toast("Dieser Bestätigungslink ist abgelaufen. Bitte fordern Sie einen neuen an.", "danger", "Link abgelaufen")
+            return redirect(url_for("resend_verification", email=row["email"]))
+        g.db.execute(
+            "UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?",
+            (utcnow(), utcnow(), row["user_id"]),
+        )
+        g.db.execute(
+            "UPDATE email_verification_tokens SET used_at = ? WHERE id = ?",
+            (utcnow(), row["id"]),
+        )
+        g.db.commit()
+        log_event("email_verified", "auth", f"E-Mail bestätigt für {row['email']}", user_id=row["user_id"])
+        push_toast("E-Mail erfolgreich bestätigt. Sie können sich jetzt anmelden.", "success", "Bestätigung erfolgreich")
+        return redirect(url_for("login"))
+
+    @app.route("/email-bestaetigen", methods=["GET", "POST"])
+    def resend_verification():
+        if request.method == "POST":
+            email = normalize_email(request.form.get("email", ""))
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            if not rate_limit_check(
+                "resend_verification",
+                ip or "unknown",
+                DEFAULT_RATE_LIMIT_FORGOT,
+                DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+            ):
+                push_toast("Bitte warten Sie kurz, bevor Sie es erneut versuchen.", "danger", "Zu viele Versuche")
+                return render_template("resend_verification.html", email=email), 429
+            user = g.db.execute("SELECT * FROM users WHERE lower(email) = ? AND active = 1", (email,)).fetchone()
+            if not user:
+                push_toast("Wenn diese E-Mail existiert, wurde ein Link versendet.", "success", "Wenn vorhanden")
+                return redirect(url_for("login"))
+            if user["email_verified_at"]:
+                push_toast("Diese E-Mail ist bereits bestätigt. Sie können sich anmelden.", "success", "Bereits bestätigt")
+                return redirect(url_for("login"))
+            ok, msg = issue_email_verification(user["id"], user["email"], user["display_name"])
+            push_toast(msg, "success" if ok else "danger", "E-Mail-Bestätigung")
+            if ok:
+                return redirect(url_for("login"))
+            return render_template("resend_verification.html", email=email)
+        email = request.args.get("email", "")
+        return render_template("resend_verification.html", email=email)
 
     @app.route("/logout")
     @login_required
@@ -1331,6 +1739,15 @@ def register_routes(app: Flask) -> None:
     @app.route("/passwort-vergessen", methods=["GET", "POST"])
     def forgot_password():
         if request.method == "POST":
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            if not rate_limit_check(
+                "forgot_password",
+                ip or "unknown",
+                DEFAULT_RATE_LIMIT_FORGOT,
+                DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+            ):
+                push_toast("Bitte warten Sie kurz, bevor Sie es erneut versuchen.", "danger", "Zu viele Versuche")
+                return render_template("forgot_password.html"), 429
             email = normalize_email(request.form.get("email", ""))
             user = g.db.execute("SELECT * FROM users WHERE lower(email) = ?", (email,)).fetchone()
             smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
@@ -1433,15 +1850,20 @@ def register_routes(app: Flask) -> None:
             categories = get_profile_categories(profile["id"])
             completion = None
             if g.user["id"] == profile["owner_user_id"]:
+                total = len(categories)
                 applicable = [c for c in categories if c["is_applicable"]]
                 completed = [c for c in applicable if c["is_complete"]]
+                not_applicable = [c for c in categories if not c["is_applicable"]]
+                done_total = len([c for c in categories if c["is_complete"] or not c["is_applicable"]])
                 started = [c for c in applicable if c["status_state"] == "started"]
                 completion = {
+                    "total": total,
+                    "done_total": done_total,
                     "applicable_total": len(applicable),
                     "completed_total": len(completed),
                     "started_total": len(started),
-                    "not_applicable_total": len([c for c in categories if not c["is_applicable"]]),
-                    "percent": int(round((len(completed) / len(applicable)) * 100)) if applicable else 100,
+                    "not_applicable_total": len(not_applicable),
+                    "percent": int(round((done_total / total) * 100)) if total else 100,
                 }
             summary.append(
                 {
@@ -1470,9 +1892,19 @@ def register_routes(app: Flask) -> None:
                         push_toast(error, "danger", "E-Mail nicht geändert")
                 else:
                     new_email = normalize_email(request.form.get("new_email", ""))
-                    g.db.execute("UPDATE users SET email = ?, updated_at = ? WHERE id = ?", (new_email, utcnow(), g.user["id"]))
+                    require_verification = get_require_email_verification()
+                    g.db.execute(
+                        "UPDATE users SET email = ?, email_verified_at = ?, updated_at = ? WHERE id = ?",
+                        (new_email, None if require_verification else g.user["email_verified_at"], utcnow(), g.user["id"]),
+                    )
                     g.db.commit()
                     log_event("account_email_change", "account", "E-Mail-Adresse geändert", user_id=g.user["id"])
+                    if require_verification:
+                        ok, msg = issue_email_verification(g.user["id"], new_email, g.user["display_name"])
+                        push_toast(msg, "success" if ok else "danger", "E-Mail-Bestätigung")
+                        session.clear()
+                        push_toast("Bitte melden Sie sich nach der Bestätigung erneut an.", "info", "Anmeldung erforderlich")
+                        return redirect(url_for("login"))
                     push_toast("Ihre E-Mail-Adresse wurde aktualisiert.", "success", "E-Mail geändert")
                 return redirect(url_for("account_settings"))
             if form_id == "password":
@@ -1532,13 +1964,28 @@ def register_routes(app: Flask) -> None:
         session["active_profile_slug"] = slug
         categories = get_profile_categories(profile["id"])
         completion = None
+        storage = None
         if g.user["id"] == profile["owner_user_id"]:
+            total = len(categories)
             applicable = [c for c in categories if c["is_applicable"]]
             completed = [c for c in applicable if c["is_complete"]]
+            not_applicable = [c for c in categories if not c["is_applicable"]]
+            done_total = len([c for c in categories if c["is_complete"] or not c["is_applicable"]])
             completion = {
+                "total": total,
+                "done_total": done_total,
                 "applicable_total": len(applicable),
                 "completed_total": len(completed),
-                "percent": int(round((len(completed) / len(applicable)) * 100)) if applicable else 100,
+                "not_applicable_total": len(not_applicable),
+                "percent": int(round((done_total / total) * 100)) if total else 100,
+            }
+            used = get_profile_storage_used_bytes(profile["id"])
+            limit_bytes = get_max_profile_storage_mb() * 1024 * 1024
+            storage = {
+                "used_bytes": used,
+                "limit_bytes": limit_bytes,
+                "remaining_bytes": max(0, limit_bytes - used),
+                "percent": int(round((used / limit_bytes) * 100)) if limit_bytes else 0,
             }
         wishes = g.db.execute("SELECT * FROM wishes WHERE profile_id = ?", (profile["id"],)).fetchone()
         log_event("profile_view", "profile", f"Profil {profile['slug']} geöffnet", profile["id"])
@@ -1547,6 +1994,7 @@ def register_routes(app: Flask) -> None:
             profile=profile,
             categories=categories,
             completion=completion,
+            storage=storage,
             wishes=wishes,
         )
 
@@ -1829,12 +2277,26 @@ def register_routes(app: Flask) -> None:
         stored_name = f"{uuid.uuid4().hex}_{slugify(uploaded.filename)}"
         target_path = app.config["UPLOAD_DIR"] / stored_name
         uploaded.save(target_path)
+        file_size = int(target_path.stat().st_size) if target_path.exists() else 0
+        used = get_profile_storage_used_bytes(profile["id"])
+        limit_bytes = get_max_profile_storage_mb() * 1024 * 1024
+        if used + file_size > limit_bytes:
+            try:
+                target_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            push_toast(
+                f"Speicherlimit erreicht. Verfügbar sind {format_bytes(limit_bytes)} pro Nachlass (frei: {format_bytes(max(0, limit_bytes - used))}).",
+                "danger",
+                "Upload abgelehnt",
+            )
+            return redirect(url_for("category_overview", slug=slug, category_key=category_key))
         g.db.execute(
             """
             INSERT INTO documents (
                 profile_id, category_key, title, description, original_name,
-                stored_name, uploaded_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                stored_name, uploaded_by, created_at, size_bytes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 profile["id"],
@@ -1845,6 +2307,7 @@ def register_routes(app: Flask) -> None:
                 stored_name,
                 g.user["id"],
                 utcnow(),
+                file_size,
             ),
         )
         g.db.commit()
@@ -1980,28 +2443,20 @@ def register_routes(app: Flask) -> None:
                 """,
                 (owned_profile["id"],),
             ).fetchall()
+        page_size = 50
         try:
             log_page = max(1, int(request.args.get("log_page", "1")))
         except ValueError:
             log_page = 1
-        try:
-            log_show = int(request.args.get("log_show", "10"))
-        except ValueError:
-            log_show = 10
-        if log_show not in {10, 20, 30, 40, 50}:
-            log_show = 10
-        page_size = 50
         offset = (log_page - 1) * page_size
         logs_page, has_more = get_relevant_logs_window(g.user, owned_profile, page_size, offset)
-        logs = logs_page[: min(log_show, len(logs_page))]
         return render_template(
             "management.html",
             owned_profile=owned_profile,
             users=users,
             grants=grants,
-            logs=logs,
+            logs=logs_page,
             log_page=log_page,
-            log_show=log_show,
             log_page_count=len(logs_page),
             log_has_more=has_more,
         )
@@ -2019,7 +2474,7 @@ def register_routes(app: Flask) -> None:
                 push_toast(error, "danger", "Benutzer nicht erstellt")
             return redirect(url_for("management"))
         try:
-            create_user_with_profile(
+            user_id = create_user_with_profile(
                 data["display_name"],
                 data["email"],
                 data["password"],
@@ -2028,6 +2483,9 @@ def register_routes(app: Flask) -> None:
             )
             g.db.commit()
             log_event("user_create", "users", f"Benutzer {data['display_name']} angelegt")
+            if get_require_email_verification():
+                ok, msg = issue_email_verification(user_id, data["email"], data["display_name"])
+                push_toast(msg, "success" if ok else "warning", "E-Mail-Bestätigung")
             push_toast("Der Benutzer wurde angelegt.", "success", "Benutzer erstellt")
         except sqlite3.IntegrityError:
             push_toast("Diese E-Mail-Adresse ist bereits vergeben.", "danger", "Benutzer nicht erstellt")
@@ -2201,6 +2659,42 @@ def register_routes(app: Flask) -> None:
                 log_event("system_update", "admin", f"Zeitzone gesetzt: {tz_name}")
                 push_toast("Systemeinstellungen wurden gespeichert.", "success", "System")
                 return redirect(url_for("admin"))
+            if form_id == "security":
+                allow_registration = 1 if request.form.get("allow_registration") else 0
+                require_email_verification = 1 if request.form.get("require_email_verification") else 0
+                try:
+                    max_mb = int(request.form.get("max_profile_storage_mb", str(DEFAULT_PROFILE_STORAGE_MB)))
+                except ValueError:
+                    max_mb = DEFAULT_PROFILE_STORAGE_MB
+                max_mb = max(10, min(max_mb, 1024))
+                backup_password = (request.form.get("backup_password") or "").strip()
+                backup_clear = bool(request.form.get("backup_password_clear"))
+                existing = (app_settings["backup_password_encrypted"] or "") if app_settings else ""
+                backup_encrypted = existing
+                if backup_clear:
+                    backup_encrypted = ""
+                elif backup_password:
+                    backup_encrypted = encrypt_secret(backup_password)
+                g.db.execute(
+                    """
+                    UPDATE app_settings
+                    SET allow_registration = ?, require_email_verification = ?, max_profile_storage_mb = ?,
+                        backup_password_encrypted = ?, updated_by = ?, updated_at = ?
+                    WHERE id = 1
+                    """,
+                    (
+                        allow_registration,
+                        require_email_verification,
+                        max_mb,
+                        backup_encrypted,
+                        g.user["id"],
+                        utcnow(),
+                    ),
+                )
+                g.db.commit()
+                log_event("security_update", "admin", "Sicherheits- und Limit-Einstellungen aktualisiert")
+                push_toast("Sicherheits- und Limit-Einstellungen wurden gespeichert.", "success", "Sicherheit")
+                return redirect(url_for("admin"))
 
             errors = validate_smtp_form(request.form)
             if errors:
@@ -2286,16 +2780,24 @@ def register_routes(app: Flask) -> None:
                 "app": "BackUpLife",
                 "created_at_utc": utcnow(),
                 "public_base_url": getattr(g, "public_base_url", None),
+                "encrypted": True,
             }
             zf.writestr("backup.json", json.dumps(meta, ensure_ascii=False, indent=2))
 
         buffer.seek(0)
+        raw_bytes = buffer.getvalue()
+        backup_password = get_backup_password()
+        if backup_password:
+            cipher = Fernet(build_fernet_key(backup_password))
+        else:
+            cipher = get_cipher()
+        encrypted = cipher.encrypt(raw_bytes)
         log_event("backup_download", "admin", "Backup ZIP heruntergeladen")
         return send_file(
-            buffer,
-            mimetype="application/zip",
+            io.BytesIO(encrypted),
+            mimetype="application/octet-stream",
             as_attachment=True,
-            download_name=f"backuplife-backup-{now}.zip",
+            download_name=f"backuplife-backup-{now}.zip.enc",
         )
 
     @app.context_processor
@@ -2332,6 +2834,14 @@ def register_routes(app: Flask) -> None:
             title="Seite nicht gefunden",
             message="Der angeforderte Inhalt existiert nicht oder wurde entfernt.",
         ), 404
+
+    @app.errorhandler(400)
+    def bad_request(error):
+        return render_template(
+            "error.html",
+            title="Anfrage ungültig",
+            message="Das Formular ist abgelaufen oder die Anfrage war ungültig. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+        ), 400
 
 
 create_app_instance = create_app()
