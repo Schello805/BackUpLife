@@ -975,6 +975,67 @@ def get_relevant_logs(user: sqlite3.Row, owned_profile: sqlite3.Row | None = Non
     return g.db.execute(query, params).fetchall()
 
 
+def get_relevant_logs_window(
+    user: sqlite3.Row,
+    owned_profile: sqlite3.Row | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[sqlite3.Row], bool]:
+    limit = max(1, min(int(limit), 200))
+    offset = max(0, int(offset))
+    fetch_limit = limit + 1
+
+    if user["is_admin"]:
+        rows = g.db.execute(
+            """
+            SELECT activity_logs.*, profiles.slug
+            FROM activity_logs
+            LEFT JOIN profiles ON profiles.id = activity_logs.profile_id
+            ORDER BY activity_logs.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (fetch_limit, offset),
+        ).fetchall()
+        return rows[:limit], len(rows) > limit
+
+    if owned_profile:
+        rows = g.db.execute(
+            """
+            SELECT activity_logs.*, profiles.slug
+            FROM activity_logs
+            LEFT JOIN profiles ON profiles.id = activity_logs.profile_id
+            WHERE activity_logs.profile_id = ? OR activity_logs.user_id = ?
+            ORDER BY activity_logs.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (owned_profile["id"], user["id"], fetch_limit, offset),
+        ).fetchall()
+        return rows[:limit], len(rows) > limit
+
+    granted_profile_ids = [
+        row["profile_id"]
+        for row in g.db.execute(
+            "SELECT DISTINCT profile_id FROM grants WHERE grantee_user_id = ?",
+            (user["id"],),
+        ).fetchall()
+    ]
+    params: list[Any] = [user["id"]]
+    query = """
+        SELECT activity_logs.*, profiles.slug
+        FROM activity_logs
+        LEFT JOIN profiles ON profiles.id = activity_logs.profile_id
+        WHERE activity_logs.user_id = ?
+    """
+    if granted_profile_ids:
+        placeholders = ",".join("?" for _ in granted_profile_ids)
+        query += f" OR activity_logs.profile_id IN ({placeholders})"
+        params.extend(granted_profile_ids)
+    query += " ORDER BY activity_logs.id DESC LIMIT ? OFFSET ?"
+    params.extend([fetch_limit, offset])
+    rows = g.db.execute(query, params).fetchall()
+    return rows[:limit], len(rows) > limit
+
+
 def get_profile_categories(profile_id: int) -> list[dict[str, Any]]:
     status_rows = g.db.execute(
         "SELECT category_key, is_applicable, is_complete FROM category_status WHERE profile_id = ?",
@@ -1394,7 +1455,7 @@ def register_routes(app: Flask) -> None:
                     "emergency_qr_svg": build_qr_svg(build_emergency_url(profile["slug"])),
                 }
             )
-        recent_logs = get_relevant_logs(g.user, get_profile_for_owner(g.user["id"]) if g.user["is_creator"] else None)[:12]
+        recent_logs = get_relevant_logs(g.user, get_profile_for_owner(g.user["id"]) if g.user["is_creator"] else None)[:10]
         return render_template("dashboard.html", summaries=summary, recent_logs=recent_logs)
 
     @app.route("/konto", methods=["GET", "POST"])
@@ -1919,14 +1980,30 @@ def register_routes(app: Flask) -> None:
                 """,
                 (owned_profile["id"],),
             ).fetchall()
-        log_scope = owned_profile["id"] if owned_profile else None
-        logs = get_relevant_logs(g.user, owned_profile)[:100]
+        try:
+            log_page = max(1, int(request.args.get("log_page", "1")))
+        except ValueError:
+            log_page = 1
+        try:
+            log_show = int(request.args.get("log_show", "10"))
+        except ValueError:
+            log_show = 10
+        if log_show not in {10, 20, 30, 40, 50}:
+            log_show = 10
+        page_size = 50
+        offset = (log_page - 1) * page_size
+        logs_page, has_more = get_relevant_logs_window(g.user, owned_profile, page_size, offset)
+        logs = logs_page[: min(log_show, len(logs_page))]
         return render_template(
             "management.html",
             owned_profile=owned_profile,
             users=users,
             grants=grants,
             logs=logs,
+            log_page=log_page,
+            log_show=log_show,
+            log_page_count=len(logs_page),
+            log_has_more=has_more,
         )
 
     @app.route("/verwaltung/benutzer/neu", methods=["POST"])

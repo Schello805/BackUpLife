@@ -141,10 +141,10 @@
     </div>
   {% endif %}
 
-  <div class="page-shell p-4">
-    <div class="section-label mb-2">Audit-Log</div>
-    <h2 class="h4 mb-3">Was wann passiert ist und wer beteiligt war</h2>
-    <div class="surface-table">
+	  <div class="page-shell p-4">
+	    <div class="section-label mb-2">Audit-Log</div>
+	    <h2 class="h4 mb-3">Was wann passiert ist und wer beteiligt war</h2>
+	    <div class="surface-table">
       <div class="table-responsive">
         <table class="table align-middle">
           <thead class="table-light">
@@ -156,21 +156,38 @@
               <th>IP</th>
             </tr>
           </thead>
-          <tbody>
-            {% for log in logs %}
-              <tr>
-                <td class="small">{{ dt_de(log['created_at']) }}</td>
-                <td>{{ log['actor_name'] }}</td>
-                <td>{{ log['detail'] }}</td>
-                <td class="small">{{ log['request_path'] }}</td>
-                <td class="small">{{ log['ip_address'] }}</td>
-              </tr>
-            {% else %}
-              <tr><td colspan="5" class="text-secondary">Noch keine Logeinträge vorhanden.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+	          <tbody>
+	            {% for log in logs %}
+	              <tr>
+	                <td class="small">{{ dt_de(log['created_at']) }}</td>
+	                <td>{{ log['actor_name'] }}</td>
+	                <td>{{ log['detail'] }}</td>
+	                <td class="small">{{ log['request_path'] }}</td>
+	                <td class="small">{{ log['ip_address'] }}</td>
+	              </tr>
+	            {% else %}
+	              <tr><td colspan="5" class="text-secondary">Noch keine Logeinträge vorhanden.</td></tr>
+	            {% endfor %}
+	          </tbody>
+	        </table>
+	      </div>
+	    </div>
+
+	    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mt-3">
+	      <div class="small text-secondary">
+	        Seite {{ log_page }} · Anzeige {{ logs|length }} von {{ log_page_count }} (max. 50 pro Seite)
+	      </div>
+	      <div class="d-flex flex-wrap gap-2">
+	        {% if log_show < 50 and log_show < log_page_count %}
+	          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('management', log_page=log_page, log_show=log_show + 10) }}">Mehr</a>
+	        {% endif %}
+	        {% if log_page > 1 %}
+	          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('management', log_page=log_page - 1, log_show=10) }}">Vorherige Seite</a>
+	        {% endif %}
+	        {% if log_show >= 50 and log_has_more %}
+	          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('management', log_page=log_page + 1, log_show=10) }}">Nächste Seite</a>
+	        {% endif %}
+	      </div>
+	    </div>
+	  </div>
 {% endblock %}
