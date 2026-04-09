@@ -148,6 +148,8 @@
             <a href="{{ url_for('privacy') }}" class="link-secondary">Datenschutz</a>
             <a href="{{ url_for('cookies_page') }}" class="link-secondary">Cookies</a>
             <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}" target="_blank" rel="noreferrer" class="link-secondary">GitHub</a>
+            {% set version_value = app_version|default(APP_VERSION, true) %}
+            <span class="text-secondary">Version: v{{ version_value }}</span>
             {% if g.user and g.user['is_admin'] %}
               <a href="{{ url_for('admin') }}" class="link-secondary">Admin</a>
             {% endif %}
