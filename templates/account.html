@@ -66,4 +66,132 @@
       </div>
     </div>
   </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-12">
+      <div class="page-shell p-4 p-lg-5">
+        <div class="section-label mb-2">Sicherheit</div>
+        <h2 class="h4 mb-3">2-Faktor-Authentifizierung (optional)</h2>
+        <p class="text-secondary mb-4">Wenn 2FA aktiv ist, reicht ein Passwort allein nicht aus. Zusätzlich wird ein zeitbasierter Code aus Ihrer Authenticator-App benötigt. Das schützt Ihr Konto, falls ein Passwort einmal in falsche Hände gerät.</p>
+
+        {% if totp_new_backup_codes %}
+          <div class="alert alert-warning">
+            <div class="fw-semibold mb-1">Ihre Backup-Codes</div>
+            <div class="small mb-2">Bitte speichern Sie diese Codes jetzt an einem sicheren Ort. Jeder Code kann genau einmal verwendet werden.</div>
+            <pre class="mb-0 small">{{ totp_new_backup_codes|join('\n') }}</pre>
+          </div>
+        {% endif %}
+
+        {% if g.user['totp_enabled'] %}
+          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div>
+              <span class="badge text-bg-success">2FA aktiv</span>
+              <div class="small text-secondary mt-2">Sie können Backup-Codes erneuern oder 2FA deaktivieren. Zur Sicherheit bestätigen Sie das jeweils mit Passwort und Code.</div>
+            </div>
+          </div>
+          <div class="row g-4 mt-2">
+            <div class="col-lg-6">
+              <div class="subtle-card p-4 bg-white">
+                <div class="fw-semibold mb-2">Backup-Codes erneuern</div>
+                <form method="post" class="vstack gap-3" novalidate>
+                  {{ csrf_input() }}
+                  <input type="hidden" name="form_id" value="totp_regen_backup">
+                  <div>
+                    <label class="form-label">Passwort bestätigen</label>
+                    <input type="password" class="form-control" name="password" autocomplete="current-password" required>
+                  </div>
+                  <div>
+                    <label class="form-label">Code aus Authenticator oder Backup-Code</label>
+                    <input class="form-control" name="code" inputmode="numeric" autocomplete="one-time-code" required>
+                  </div>
+                  <div class="d-flex justify-content-end">
+                    <button class="btn btn-outline-primary btn-sm">Neue Codes erstellen</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="subtle-card p-4 bg-white">
+                <div class="fw-semibold mb-2">2FA deaktivieren</div>
+                <form method="post" class="vstack gap-3" novalidate>
+                  {{ csrf_input() }}
+                  <input type="hidden" name="form_id" value="totp_disable">
+                  <div>
+                    <label class="form-label">Passwort bestätigen</label>
+                    <input type="password" class="form-control" name="password" autocomplete="current-password" required>
+                  </div>
+                  <div>
+                    <label class="form-label">Code aus Authenticator oder Backup-Code</label>
+                    <input class="form-control" name="code" inputmode="numeric" autocomplete="one-time-code" required>
+                  </div>
+                  <div class="d-flex justify-content-end">
+                    <button class="btn btn-outline-danger btn-sm" onclick="return confirm('2FA wirklich deaktivieren?')">2FA deaktivieren</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          {% if totp_qr_svg %}
+            <div class="row g-4">
+              <div class="col-lg-5">
+                <div class="subtle-card p-4 bg-white h-100">
+                  <div class="fw-semibold mb-2">Schritt 1: QR-Code scannen</div>
+                  <div class="small text-secondary mb-3">Scannen Sie den QR-Code mit Ihrer Authenticator-App (z. B. Google Authenticator, Microsoft Authenticator oder 1Password).</div>
+                  <div class="qr-wrap mx-auto">{{ totp_qr_svg|safe }}</div>
+                </div>
+              </div>
+              <div class="col-lg-7">
+                <div class="subtle-card p-4 bg-white h-100">
+                  <div class="fw-semibold mb-2">Schritt 2: Code bestätigen</div>
+                  <div class="small text-secondary mb-3">Geben Sie den 6-stelligen Code ein. Danach ist 2FA aktiv.</div>
+                  <form method="post" class="vstack gap-3" novalidate>
+                    {{ csrf_input() }}
+                    <input type="hidden" name="form_id" value="totp_confirm">
+                    <div>
+                      <label class="form-label">6-stelliger Code</label>
+                      <input class="form-control" name="code" inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="12" required>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                      <button class="btn btn-primary btn-sm">2FA aktivieren</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <div class="row g-4">
+              <div class="col-lg-7">
+                <div class="subtle-card p-4 bg-white h-100">
+                  <div class="fw-semibold mb-2">2FA aktivieren</div>
+                  <div class="small text-secondary mb-3">Wir erzeugen einen QR-Code, den Sie mit Ihrer Authenticator-App scannen. Erst nach der Bestätigung wird 2FA aktiv.</div>
+                  <form method="post" class="vstack gap-3" novalidate>
+                    {{ csrf_input() }}
+                    <input type="hidden" name="form_id" value="totp_begin">
+                    <div>
+                      <label class="form-label">Passwort bestätigen</label>
+                      <input type="password" class="form-control" name="password" autocomplete="current-password" required>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                      <button class="btn btn-outline-primary btn-sm">QR-Code erzeugen</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+              <div class="col-lg-5">
+                <div class="subtle-card p-4 bg-white h-100">
+                  <div class="fw-semibold mb-2">Gut zu wissen</div>
+                  <ul class="hint-list ps-0 mb-0">
+                    <li>2FA ist optional, aber empfehlenswert</li>
+                    <li>Sie erhalten zusätzlich Backup-Codes für den Notfall</li>
+                    <li>Ihre Codes werden lokal verschlüsselt gespeichert</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
 {% endblock %}

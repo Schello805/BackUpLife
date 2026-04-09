@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}2FA · BackUpLife{% endblock %}
+{% block content %}
+  <div class="auth-wrapper">
+    <div class="row g-4 align-items-center w-100">
+      <div class="col-lg-7">
+        <div class="hero-panel p-4 p-lg-5">
+          <div class="d-flex align-items-center gap-4 mb-4">
+            <img src="{{ url_for('logo_asset') }}" alt="BackUpLife Logo" class="auth-brand">
+            <div>
+              <p class="section-label mb-2">Zweiter Schritt</p>
+              <h1 class="display-6 fw-semibold mb-3">Bitte bestätigen Sie Ihre Anmeldung.</h1>
+              <p class="mb-0 text-white-50">Manchmal fühlt sich ein zusätzlicher Schritt wie „zu viel“ an. Genau dann ist er besonders wertvoll: Er schützt Ihren Nachlassbereich, selbst wenn ein Passwort einmal irgendwo auftaucht.</p>
+            </div>
+          </div>
+          <ul class="hint-list ps-0 mb-0">
+            <li>Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein</li>
+            <li>Alternativ funktioniert auch ein Backup-Code (z. B. ABCDE-12345)</li>
+            <li>Wenn es gerade stressig ist: atmen, tippen, fertig</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="page-shell p-4 p-lg-5">
+          <p class="section-label mb-2">2FA</p>
+          <h2 class="h3 mb-2">Code eingeben</h2>
+          <p class="text-secondary mb-4">Für <strong>{{ user['display_name'] }}</strong>. Der Code ändert sich alle 30 Sekunden.</p>
+          <form method="post" class="vstack gap-3" novalidate>
+            {{ csrf_input() }}
+            <div>
+              <label class="form-label">6-stelliger Code oder Backup-Code</label>
+              <input class="form-control form-control-lg" name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
+            </div>
+            <button class="btn btn-primary">Anmeldung abschließen</button>
+          </form>
+          <div class="mt-4 small">
+            <a href="{{ url_for('login') }}">Zurück zum Login</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

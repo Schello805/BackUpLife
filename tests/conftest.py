@@ -108,12 +108,23 @@ def creator_user(app, app_module):
 
         g.db = app_module.get_db(app)
         app_module.init_db(app)
+        admin_id = app_module.create_user_with_profile(
+            "Admin",
+            "admin@example.com",
+            "very-secure-password",
+            "admin",
+            None,
+        )
+        g.db.execute(
+            "UPDATE users SET email_verified_at = ? WHERE id = ?",
+            (app_module.utcnow(), admin_id),
+        )
         user_id = app_module.create_user_with_profile(
             "Creator",
             "creator@example.com",
             "very-secure-password",
             "creator",
-            None,
+            admin_id,
         )
         g.db.execute(
             "UPDATE users SET email_verified_at = ? WHERE id = ?",

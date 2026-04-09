@@ -298,3 +298,56 @@ def test_backup_download_encrypted(app, app_module, logged_in_admin):
         assert "backup.json" in zf.namelist()
         meta = json.loads(zf.read("backup.json").decode("utf-8"))
         assert meta.get("app") == "BackUpLife"
+
+
+def test_login_requires_totp_when_enabled(app, app_module):
+    # Create admin + enable TOTP, then ensure login goes through /login/2fa.
+    secret = "JBSWY3DPEHPK3PXP"
+    with app.test_request_context("/setup"):
+        from flask import g
+
+        g.db = app_module.get_db(app)
+        app_module.init_db(app)
+        user_id = app_module.create_user_with_profile(
+            "Admin",
+            "admin-totp@example.com",
+            "very-secure-password",
+            "admin",
+            None,
+        )
+        g.db.execute(
+            """
+            UPDATE users
+            SET email_verified_at = ?, totp_secret_encrypted = ?, totp_enabled = 1, totp_enabled_at = ?
+            WHERE id = ?
+            """,
+            (app_module.utcnow(), app_module.encrypt_secret(secret), app_module.utcnow(), user_id),
+        )
+        g.db.commit()
+        g.db.close()
+
+    client = app.test_client()
+    client.get("/login")
+    with client.session_transaction() as sess:
+        csrf = sess.get("_csrf_token")
+    resp = client.post(
+        "/login",
+        data={"csrf_token": csrf, "email": "admin-totp@example.com", "password": "very-secure-password"},
+        headers={"X-Forwarded-For": "203.0.113.12"},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "/login/2fa" in resp.headers.get("Location", "")
+
+    # Complete 2FA.
+    client.get("/login/2fa")
+    with client.session_transaction() as sess:
+        csrf2 = sess.get("_csrf_token")
+    code = app_module.totp_code_at(secret, int(app_module.time.time()))
+    resp2 = client.post(
+        "/login/2fa",
+        data={"csrf_token": csrf2, "code": code},
+        headers={"X-Forwarded-For": "203.0.113.12"},
+        follow_redirects=False,
+    )
+    assert resp2.status_code in (302, 303)

@@ -10,12 +10,15 @@ import os
 import re
 import secrets
 import sqlite3
+import struct
 import textwrap
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -491,6 +494,11 @@ def init_db(app: Flask) -> None:
         is_admin INTEGER NOT NULL DEFAULT 0,
         is_creator INTEGER NOT NULL DEFAULT 0,
         is_reader INTEGER NOT NULL DEFAULT 0,
+        email_verified_at TEXT,
+        totp_secret_encrypted TEXT NOT NULL DEFAULT '',
+        totp_enabled INTEGER NOT NULL DEFAULT 0,
+        totp_backup_codes_encrypted TEXT NOT NULL DEFAULT '',
+        totp_enabled_at TEXT,
         active INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -662,6 +670,15 @@ def init_db(app: Flask) -> None:
         db.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
         # Existing installations: treat current users as verified to avoid lock-outs after upgrade.
         db.execute("UPDATE users SET email_verified_at = ? WHERE email_verified_at IS NULL", (utcnow(),))
+    user_cols = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "totp_secret_encrypted" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN totp_secret_encrypted TEXT NOT NULL DEFAULT ''")
+    if "totp_enabled" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0")
+    if "totp_backup_codes_encrypted" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN totp_backup_codes_encrypted TEXT NOT NULL DEFAULT ''")
+    if "totp_enabled_at" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN totp_enabled_at TEXT")
 
     doc_cols = {row["name"] for row in db.execute("PRAGMA table_info(documents)").fetchall()}
     if "size_bytes" not in doc_cols:
@@ -687,6 +704,32 @@ def init_db(app: Flask) -> None:
         db.execute("ALTER TABLE app_settings ADD COLUMN max_profile_storage_mb INTEGER NOT NULL DEFAULT 100")
     if "backup_password_encrypted" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN backup_password_encrypted TEXT NOT NULL DEFAULT ''")
+
+    # Enforce exactly one admin in the database: keep the earliest admin, demote the rest.
+    try:
+        admins = db.execute("SELECT id FROM users WHERE is_admin = 1 ORDER BY id ASC").fetchall()
+        if len(admins) > 1:
+            keep_id = admins[0]["id"]
+            for row in admins[1:]:
+                db.execute(
+                    "UPDATE users SET is_admin = 0, is_creator = 1, updated_at = ? WHERE id = ?",
+                    (utcnow(), row["id"]),
+                )
+            db.execute("UPDATE users SET is_admin = 1, updated_at = ? WHERE id = ?", (utcnow(), keep_id))
+        elif len(admins) == 0:
+            first = db.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1").fetchone()
+            if first:
+                db.execute(
+                    "UPDATE users SET is_admin = 1, is_creator = 1, updated_at = ? WHERE id = ?",
+                    (utcnow(), first["id"]),
+                )
+    except Exception:
+        pass
+    # Partial unique index: only one row may have is_admin=1.
+    try:
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_single_admin ON users(is_admin) WHERE is_admin = 1")
+    except Exception:
+        pass
 
     db.commit()
     db.close()
@@ -727,6 +770,61 @@ def decrypt_secret(value: str) -> str:
         return get_cipher().decrypt(value.encode("utf-8")).decode("utf-8")
     except InvalidToken:
         return "[Entschlüsselung fehlgeschlagen]"
+
+
+def generate_totp_secret() -> str:
+    # 160-bit secret (RFC 4226/6238 typical). Keep padding out for cleaner UX.
+    return base64.b32encode(secrets.token_bytes(20)).decode("utf-8").rstrip("=")
+
+
+def totp_code_at(secret_b32: str, for_time: int, step_seconds: int = 30, digits: int = 6) -> str:
+    secret = secret_b32.strip().upper()
+    pad = (-len(secret)) % 8
+    key = base64.b32decode(secret + ("=" * pad), casefold=True)
+    counter = int(for_time // step_seconds)
+    msg = struct.pack(">Q", counter)
+    digest = hmac.new(key, msg, hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    code_int = struct.unpack(">I", digest[offset : offset + 4])[0] & 0x7FFFFFFF
+    return str(code_int % (10**digits)).zfill(digits)
+
+
+def normalize_otp(value: str) -> str:
+    return re.sub(r"[^0-9a-zA-Z]", "", (value or "").strip()).upper()
+
+
+def verify_totp(secret_b32: str, code: str, skew_steps: int = 1) -> bool:
+    norm = normalize_otp(code)
+    if not norm.isdigit() or len(norm) != 6:
+        return False
+    try:
+        now = int(time.time())
+        for delta in range(-skew_steps, skew_steps + 1):
+            if hmac.compare_digest(totp_code_at(secret_b32, now + (delta * 30)), norm):
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def generate_backup_codes(count: int = 10) -> list[str]:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    codes: list[str] = []
+    for _ in range(count):
+        raw = "".join(secrets.choice(alphabet) for _ in range(10))
+        codes.append(f"{raw[:5]}-{raw[5:]}")
+    return codes
+
+
+def backup_codes_to_storage(codes: list[str]) -> str:
+    normalized = [normalize_otp(code) for code in codes if normalize_otp(code)]
+    return "\n".join(normalized)
+
+
+def backup_codes_from_storage(value: str) -> list[str]:
+    if not value:
+        return []
+    return [line.strip() for line in value.splitlines() if line.strip()]
 
 
 def create_unique_slug(db: sqlite3.Connection, display_name: str) -> str:
@@ -781,6 +879,11 @@ def create_user_with_profile(
     acting_user_id: int | None,
 ) -> int:
     now = utcnow()
+    if role == "admin":
+        # Exactly one admin is allowed: the very first user created during setup.
+        existing = g.db.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
+        if existing:
+            raise ValueError("Admin kann nicht angelegt werden. Es gibt genau einen Admin (der erste Benutzer).")
     is_admin = 1 if role == "admin" else 0
     is_creator = 1 if role in {"admin", "creator"} else 0
     is_reader = 1 if role == "reader" else 0
@@ -846,7 +949,7 @@ def validate_user_form(form: Any) -> tuple[list[str], dict[str, str]]:
     if not is_valid_email(email):
         errors.append("Bitte geben Sie eine gültige E-Mail-Adresse ein.")
     errors.extend(validate_password_fields(password))
-    if role not in {"reader", "creator", "admin"}:
+    if role not in {"reader", "creator"}:
         errors.append("Die ausgewählte Rolle ist ungültig.")
     return errors, {
         "display_name": display_name,
@@ -1577,6 +1680,8 @@ self.addEventListener('fetch', (event) => {
                         "admin",
                         None,
                     )
+                    # First user is the only admin; mark verified to avoid lockouts if verification is enabled later.
+                    g.db.execute("UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?", (utcnow(), utcnow(), user_id))
                     g.db.commit()
                     session.clear()
                     session["user_id"] = user_id
@@ -1629,6 +1734,19 @@ self.addEventListener('fetch', (event) => {
                 return redirect(url_for("resend_verification", email=email))
             else:
                 session.clear()
+                if user["totp_enabled"]:
+                    session["pre_2fa_user_id"] = user["id"]
+                    session["pre_2fa_target_slug"] = target_slug
+                    session["pre_2fa_next"] = request.args.get("next") or ""
+                    log_event(
+                        "login_password_ok_2fa_required",
+                        "auth",
+                        f"Passwort ok, 2FA erforderlich für {user['display_name']}",
+                        user_id=user["id"],
+                    )
+                    push_toast("Bitte geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.", "info", "Zweiter Schritt")
+                    return redirect(url_for("login_2fa"))
+
                 session["user_id"] = user["id"]
                 session["active_profile_slug"] = target_slug
                 log_event("login_success", "auth", f"Login erfolgreich für {user['display_name']}", user_id=user["id"])
@@ -1638,6 +1756,82 @@ self.addEventListener('fetch', (event) => {
                     return redirect(url_for("profile_dashboard", slug=target_slug))
                 return redirect(next_url or url_for("dashboard"))
         return render_template("login.html", target_slug=target_slug)
+
+    @app.route("/login/2fa", methods=["GET", "POST"])
+    def login_2fa():
+        if not g.system_initialized:
+            return redirect(url_for("setup"))
+        pre_user_id = session.get("pre_2fa_user_id")
+        if not pre_user_id:
+            return redirect(url_for("login"))
+        user = g.db.execute("SELECT * FROM users WHERE id = ? AND active = 1", (pre_user_id,)).fetchone()
+        if not user or not user["totp_enabled"]:
+            session.pop("pre_2fa_user_id", None)
+            session.pop("pre_2fa_target_slug", None)
+            session.pop("pre_2fa_next", None)
+            return redirect(url_for("login"))
+
+        if request.method == "POST":
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            if not rate_limit_check(
+                "login2fa",
+                ip or "unknown",
+                DEFAULT_RATE_LIMIT_LOGIN,
+                DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+            ):
+                push_toast(
+                    "Zu viele Versuche. Bitte warten Sie kurz und versuchen Sie es erneut.",
+                    "danger",
+                    "Bitte kurz warten",
+                )
+                return render_template("login_2fa.html", user=user), 429
+
+            code = request.form.get("code", "")
+            secret = decrypt_secret(user["totp_secret_encrypted"])
+            ok = False
+            used_backup = False
+            if secret and verify_totp(secret, code):
+                ok = True
+            else:
+                backup_norm = normalize_otp(code)
+                if backup_norm:
+                    backup_list = backup_codes_from_storage(decrypt_secret(user["totp_backup_codes_encrypted"]))
+                    if backup_norm in backup_list:
+                        ok = True
+                        used_backup = True
+                        backup_list = [c for c in backup_list if c != backup_norm]
+                        g.db.execute(
+                            "UPDATE users SET totp_backup_codes_encrypted = ?, updated_at = ? WHERE id = ?",
+                            (encrypt_secret("\n".join(backup_list)), utcnow(), user["id"]),
+                        )
+                        g.db.commit()
+
+            if not ok:
+                log_event("login_2fa_failed", "auth", f"2FA fehlgeschlagen für {user['display_name']}", user_id=user["id"])
+                push_toast("Der Code ist nicht korrekt. Bitte versuchen Sie es erneut.", "danger", "2FA fehlgeschlagen")
+                return render_template("login_2fa.html", user=user)
+
+            target_slug = session.pop("pre_2fa_target_slug", "") or ""
+            next_url = session.pop("pre_2fa_next", "") or ""
+            session.pop("pre_2fa_user_id", None)
+            session["user_id"] = user["id"]
+            session["active_profile_slug"] = target_slug
+            log_event(
+                "login_success_2fa",
+                "auth",
+                f"Login erfolgreich (2FA) für {user['display_name']}",
+                user_id=user["id"],
+            )
+            push_toast(
+                "Anmeldung abgeschlossen." + (" (Backup-Code verwendet)" if used_backup else ""),
+                "success",
+                "Willkommen",
+            )
+            if target_slug:
+                return redirect(url_for("profile_dashboard", slug=target_slug))
+            return redirect(next_url or url_for("dashboard"))
+
+        return render_template("login_2fa.html", user=user)
 
     @app.route("/registrieren", methods=["GET", "POST"])
     def register():
@@ -1968,11 +2162,132 @@ self.addEventListener('fetch', (event) => {
                     log_event("account_password_change", "account", "Passwort geändert", user_id=g.user["id"])
                     push_toast("Ihr Passwort wurde aktualisiert.", "success", "Passwort geändert")
                 return redirect(url_for("account_settings"))
+            if form_id == "totp_begin":
+                password = request.form.get("password", "")
+                if not verify_password(password, g.user["password_hash"]):
+                    push_toast("Das Passwort ist nicht korrekt.", "danger", "2FA nicht gestartet")
+                    return redirect(url_for("account_settings"))
+                if g.user["totp_enabled"]:
+                    push_toast("2FA ist bereits aktiv.", "info", "2FA")
+                    return redirect(url_for("account_settings"))
+                secret = generate_totp_secret()
+                g.db.execute(
+                    """
+                    UPDATE users
+                    SET totp_secret_encrypted = ?, totp_enabled = 0, totp_backup_codes_encrypted = '',
+                        totp_enabled_at = NULL, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (encrypt_secret(secret), utcnow(), g.user["id"]),
+                )
+                g.db.commit()
+                log_event("totp_begin", "account", "2FA Einrichtung gestartet", user_id=g.user["id"])
+                push_toast("2FA wurde vorbereitet. Bitte scannen Sie den QR-Code und bestätigen Sie den Code.", "success", "2FA starten")
+                return redirect(url_for("account_settings"))
+            if form_id == "totp_confirm":
+                if g.user["totp_enabled"]:
+                    push_toast("2FA ist bereits aktiv.", "info", "2FA")
+                    return redirect(url_for("account_settings"))
+                secret = decrypt_secret(g.user["totp_secret_encrypted"])
+                code = request.form.get("code", "")
+                if not secret or not verify_totp(secret, code):
+                    push_toast("Der Code ist nicht korrekt. Bitte versuchen Sie es erneut.", "danger", "2FA nicht aktiviert")
+                    return redirect(url_for("account_settings"))
+                codes = generate_backup_codes(10)
+                g.db.execute(
+                    """
+                    UPDATE users
+                    SET totp_enabled = 1, totp_enabled_at = ?, totp_backup_codes_encrypted = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (utcnow(), encrypt_secret(backup_codes_to_storage(codes)), utcnow(), g.user["id"]),
+                )
+                g.db.commit()
+                session["totp_new_backup_codes"] = codes
+                log_event("totp_enabled", "account", "2FA aktiviert", user_id=g.user["id"])
+                push_toast("2FA wurde aktiviert. Bitte sichern Sie Ihre Backup-Codes an einem sicheren Ort.", "success", "2FA aktiv")
+                return redirect(url_for("account_settings"))
+            if form_id == "totp_disable":
+                password = request.form.get("password", "")
+                code = request.form.get("code", "")
+                if not verify_password(password, g.user["password_hash"]):
+                    push_toast("Das Passwort ist nicht korrekt.", "danger", "2FA nicht deaktiviert")
+                    return redirect(url_for("account_settings"))
+                if not g.user["totp_enabled"]:
+                    push_toast("2FA ist aktuell nicht aktiv.", "info", "2FA")
+                    return redirect(url_for("account_settings"))
+                secret = decrypt_secret(g.user["totp_secret_encrypted"])
+                ok = bool(secret and verify_totp(secret, code))
+                if not ok:
+                    backup_norm = normalize_otp(code)
+                    backup_list = backup_codes_from_storage(decrypt_secret(g.user["totp_backup_codes_encrypted"]))
+                    ok = backup_norm in backup_list
+                if not ok:
+                    push_toast("Der Code ist nicht korrekt. 2FA bleibt aktiv.", "danger", "2FA nicht deaktiviert")
+                    return redirect(url_for("account_settings"))
+                g.db.execute(
+                    """
+                    UPDATE users
+                    SET totp_secret_encrypted = '', totp_enabled = 0, totp_backup_codes_encrypted = '',
+                        totp_enabled_at = NULL, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (utcnow(), g.user["id"]),
+                )
+                g.db.commit()
+                log_event("totp_disabled", "account", "2FA deaktiviert", user_id=g.user["id"])
+                push_toast("2FA wurde deaktiviert.", "success", "2FA deaktiviert")
+                return redirect(url_for("account_settings"))
+            if form_id == "totp_regen_backup":
+                password = request.form.get("password", "")
+                code = request.form.get("code", "")
+                if not verify_password(password, g.user["password_hash"]):
+                    push_toast("Das Passwort ist nicht korrekt.", "danger", "Backup-Codes nicht erneuert")
+                    return redirect(url_for("account_settings"))
+                if not g.user["totp_enabled"]:
+                    push_toast("2FA ist aktuell nicht aktiv.", "info", "2FA")
+                    return redirect(url_for("account_settings"))
+                secret = decrypt_secret(g.user["totp_secret_encrypted"])
+                ok = bool(secret and verify_totp(secret, code))
+                if not ok:
+                    backup_norm = normalize_otp(code)
+                    backup_list = backup_codes_from_storage(decrypt_secret(g.user["totp_backup_codes_encrypted"]))
+                    ok = backup_norm in backup_list
+                if not ok:
+                    push_toast("Der Code ist nicht korrekt.", "danger", "Backup-Codes nicht erneuert")
+                    return redirect(url_for("account_settings"))
+                codes = generate_backup_codes(10)
+                g.db.execute(
+                    "UPDATE users SET totp_backup_codes_encrypted = ?, updated_at = ? WHERE id = ?",
+                    (encrypt_secret(backup_codes_to_storage(codes)), utcnow(), g.user["id"]),
+                )
+                g.db.commit()
+                session["totp_new_backup_codes"] = codes
+                log_event("totp_backup_regen", "account", "Backup-Codes erneuert", user_id=g.user["id"])
+                push_toast("Neue Backup-Codes wurden erstellt. Bitte sichern Sie sie erneut.", "success", "Backup-Codes erneuert")
+                return redirect(url_for("account_settings"))
             push_toast("Unbekannte Aktion.", "warning", "Konto")
             return redirect(url_for("account_settings"))
 
         log_event("account_view", "account", "Konto-Einstellungen geöffnet", user_id=g.user["id"])
-        return render_template("account.html")
+        totp_secret = decrypt_secret(g.user["totp_secret_encrypted"])
+        provisioning_uri = ""
+        qr_svg = ""
+        if totp_secret and not g.user["totp_enabled"] and re.fullmatch(r"[A-Z2-7]+", totp_secret.upper() or ""):
+            issuer = "BackUpLife"
+            account = g.user["email"]
+            label = f"{issuer}:{account}"
+            provisioning_uri = (
+                f"otpauth://totp/{quote(label)}?secret={quote(totp_secret)}&issuer={quote(issuer)}&digits=6&period=30"
+            )
+            qr_svg = build_qr_svg(provisioning_uri)
+        new_backup_codes = session.pop("totp_new_backup_codes", None)
+        return render_template(
+            "account.html",
+            totp_provisioning_uri=provisioning_uri,
+            totp_qr_svg=qr_svg,
+            totp_new_backup_codes=new_backup_codes,
+        )
 
     @app.route("/hilfe")
     def help_page():
@@ -2513,7 +2828,10 @@ self.addEventListener('fetch', (event) => {
     def create_user():
         errors, data = validate_user_form(request.form)
         role = data["role"]
-        if role in {"creator", "admin"} and not g.user["is_admin"]:
+        if role == "admin":
+            errors = list(errors) + ["Admin kann nicht angelegt werden. Es gibt genau einen Admin (der erste Benutzer)."]
+            role = "creator"
+        if role == "creator" and not g.user["is_admin"]:
             abort(403)
         if errors:
             for error in errors:
