@@ -468,7 +468,8 @@ def init_db(app: Flask) -> None:
     db = get_db(app)
     db.executescript(schema)
     db.execute("INSERT OR IGNORE INTO smtp_settings (id, updated_at) VALUES (1, '')")
-    db.execute("INSERT OR IGNORE INTO app_settings (id, timezone, public_base_url, updated_at) VALUES (1, 'Europe/Berlin', '', '')")
+    # Keep this insert compatible with older DBs that might not yet have newer columns.
+    db.execute("INSERT OR IGNORE INTO app_settings (id, timezone, updated_at) VALUES (1, 'Europe/Berlin', '')")
 
     # Lightweight migration: add new columns without a full migration framework.
     wishes_cols = {row["name"] for row in db.execute("PRAGMA table_info(wishes)").fetchall()}
