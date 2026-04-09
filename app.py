@@ -1519,10 +1519,12 @@ def get_profile_by_slug(slug: str) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def resolve_profile_by_slug(slug: str) -> tuple[sqlite3.Row | None, str | None]:
+def resolve_profile_by_slug(slug: str, *, allow_fuzzy: bool = True) -> tuple[sqlite3.Row | None, str | None]:
     profile = get_profile_by_slug(slug)
     if profile:
         return profile, None
+    if not allow_fuzzy:
+        return None, None
     if "-" not in slug:
         return None, None
     base = slug.split("-", 1)[0]
@@ -2038,6 +2040,11 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/version")
     def version_info():
+        # Avoid leaking internals on public instances. Allow only local calls by default.
+        # Admins can still see build info in the footer.
+        ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip() or "")
+        if os.environ.get("BACKUPLIFE_PUBLIC_VERSION_ENDPOINT") != "1" and ip not in ("127.0.0.1", "::1"):
+            abort(404)
         info = get_build_info()
         info.update(
             {
@@ -3406,7 +3413,7 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/notfall/<slug>")
     def profile_emergency(slug: str):
-        profile, canonical_slug = resolve_profile_by_slug(slug)
+        profile, canonical_slug = resolve_profile_by_slug(slug, allow_fuzzy=False)
         if canonical_slug and canonical_slug != slug:
             return redirect(url_for("profile_emergency", slug=canonical_slug))
         if not profile:
@@ -3420,7 +3427,7 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/notfall/<slug>/karte")
     def profile_emergency_card(slug: str):
-        profile, canonical_slug = resolve_profile_by_slug(slug)
+        profile, canonical_slug = resolve_profile_by_slug(slug, allow_fuzzy=False)
         if canonical_slug and canonical_slug != slug:
             return redirect(url_for("profile_emergency_card", slug=canonical_slug))
         if not profile:
