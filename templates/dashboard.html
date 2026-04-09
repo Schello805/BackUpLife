@@ -81,10 +81,17 @@
               <div class="row g-3">
                 {% for category in entry.categories %}
                   <div class="col-md-6">
-                    <div class="subtle-card p-3 h-100">
-                      <div class="fw-semibold">{{ category.label }}</div>
-                      <div class="text-secondary small">{{ category.records_count }} Einträge · {{ category.documents_count }} Dateien</div>
-                    </div>
+                    {% if has_category_access(g.user, entry.profile['id'], category.key) %}
+                      <a class="subtle-card p-3 h-100 d-block category-card-link" href="{{ url_for('category_overview', slug=entry.profile['slug'], category_key=category.key) }}" aria-label="{{ category.label }} öffnen">
+                        <div class="fw-semibold">{{ category.label }}</div>
+                        <div class="text-secondary small">{{ category.records_count }} Einträge · {{ category.documents_count }} Dateien</div>
+                      </a>
+                    {% else %}
+                      <div class="subtle-card p-3 h-100 category-card-disabled" aria-label="{{ category.label }} (kein Zugriff)">
+                        <div class="fw-semibold">{{ category.label }}</div>
+                        <div class="text-secondary small">{{ category.records_count }} Einträge · {{ category.documents_count }} Dateien</div>
+                      </div>
+                    {% endif %}
                   </div>
                 {% endfor %}
               </div>
