@@ -103,3 +103,16 @@ systemctl restart nginx
 
 echo "BackUpLife wurde aktualisiert."
 echo "Service: systemctl status backuplife"
+echo
+echo "Status:"
+systemctl --no-pager --full status backuplife || true
+echo
+echo "Letzte Logs:"
+journalctl -u backuplife -n 30 --no-pager || true
+echo
+echo "Port 8000 Listener:"
+ss -ltnp 2>/dev/null | grep -E '[:.]8000\\b' || echo "Kein Listener auf Port 8000 gefunden."
+echo
+echo "Hinweis: Wenn du per CLI starten willst, stoppe vorher den Service oder nutze einen anderen Port:"
+echo "  systemctl stop backuplife"
+echo "  PORT=8001 python3 app.py"
