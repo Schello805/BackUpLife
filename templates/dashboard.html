@@ -1,0 +1,117 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard · Aeterna{% endblock %}
+{% block content %}
+  <div class="hero-panel p-4 p-lg-5 mb-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-8">
+        <p class="section-label mb-2">Dashboard</p>
+        <h1 class="display-6 fw-semibold mb-3">Alle sichtbaren Nachlassbereiche in einer ruhigen Übersicht</h1>
+        <p class="mb-0 text-white-50">Von hier aus wechseln Sie direkt in einzelne Nachlassbereiche, prüfen die Vollständigkeit und sehen die letzten Aktivitäten. Bei mehreren sichtbaren Nachlässen bleibt die Navigation trotzdem bewusst klein und klar.</p>
+      </div>
+      <div class="col-lg-4">
+        <div class="subtle-card p-4 bg-white text-dark">
+          <div class="section-label mb-2">Schnell verstanden</div>
+          <ul class="hint-list ps-0 mb-0">
+            <li><strong>Dashboard:</strong> Überblick</li>
+            <li><strong>Digitaler Nachlass:</strong> Kategorien und Dokumente</li>
+            <li><strong>Letzte Wünsche:</strong> persönliche Hinweise</li>
+            <li><strong>Verwaltung:</strong> Nutzer, Freigaben und Logs</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    {% for entry in summaries %}
+      <div class="col-xl-6">
+        <div class="page-shell p-4 h-100">
+          <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+            <div>
+              <div class="section-label mb-2">Persönlicher Bereich</div>
+              <h2 class="h4 mb-1">{{ entry.profile['title'] }}</h2>
+              <div class="text-secondary small">{{ entry.profile['owner_name'] }} · Hinweis-URL: /hinweis/{{ entry.profile['slug'] }}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <a class="btn btn-primary btn-sm" href="{{ url_for('profile_dashboard', slug=entry.profile['slug']) }}">Öffnen</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('export_profile', slug=entry.profile['slug']) }}">Drucken</a>
+            </div>
+          </div>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <div class="metric-card p-3 text-center">
+                <div class="metric-value">{{ entry.record_count }}</div>
+                <div class="text-secondary small">Einträge</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="metric-card p-3 text-center">
+                <div class="metric-value">{{ entry.document_count }}</div>
+                <div class="text-secondary small">Dokumente</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="metric-card p-3 text-center">
+                <div class="metric-value">{{ entry.grant_count }}</div>
+                <div class="text-secondary small">Freigaben</div>
+              </div>
+            </div>
+          </div>
+          <div class="row g-3">
+            {% for category in entry.categories %}
+              <div class="col-md-6">
+                <div class="subtle-card p-3 h-100">
+                  <div class="fw-semibold">{{ category.label }}</div>
+                  <div class="text-secondary small">{{ category.records_count }} Einträge · {{ category.documents_count }} Dateien</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="col-12">
+        <div class="page-shell empty-state p-5 text-center">
+          <h2 class="h4 mb-2">Noch kein sichtbarer Nachlassbereich</h2>
+          <p class="text-secondary mb-0">Sobald Ihnen ein Bereich gehört oder freigegeben wurde, erscheint er hier.</p>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="page-shell p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <div class="section-label mb-2">Nachvollziehbarkeit</div>
+        <h2 class="h4 mb-0">Letzte Aktivitäten</h2>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('management') }}">Zum vollständigen Log</a>
+    </div>
+    <div class="surface-table">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Zeit</th>
+              <th>Akteur</th>
+              <th>Bereich</th>
+              <th>Detail</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in recent_logs %}
+              <tr>
+                <td class="small">{{ log['created_at'].replace('T', ' ') }}</td>
+                <td>{{ log['actor_name'] }}</td>
+                <td>{{ log['area'] }}</td>
+                <td>{{ log['detail'] }}</td>
+                <td class="small">{{ log['ip_address'] }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}

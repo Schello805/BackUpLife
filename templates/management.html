@@ -1,0 +1,176 @@
+{% extends "layout.html" %}
+{% block title %}Verwaltung{% endblock %}
+{% block content %}
+  <div class="hero-panel p-4 p-lg-5 mb-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-8">
+        <p class="section-label mb-2">Verwaltung</p>
+        <h1 class="display-6 fw-semibold mb-3">Benutzer, Freigaben und Zugriffsprotokolle transparent an einem Ort</h1>
+        <p class="mb-0 text-white-50">Hier definieren Sie, wer was sehen darf. Gleichzeitig behalten Sie mit Audit-Logs im Blick, wer sich wann angemeldet, Inhalte gelesen oder exportiert hat.</p>
+      </div>
+      <div class="col-lg-4">
+        <div class="subtle-card p-4 bg-white text-dark">
+          <div class="section-label mb-2">Merksatz</div>
+          <ul class="hint-list ps-0 mb-0">
+            <li>Ersteller sehen nur den eigenen Nachlass</li>
+            <li>Leser erhalten nur explizit freigegebene Inhalte</li>
+            <li>Admin verwaltet System und SMTP separat</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if owned_profile %}
+    <div class="row g-4 mb-4">
+      <div class="col-xl-5">
+        <div class="page-shell p-4 h-100">
+          <div class="section-label mb-2">Benutzerverwaltung</div>
+          <h2 class="h4 mb-3">Neuen Benutzer anlegen</h2>
+          <form method="post" action="{{ url_for('create_user') }}" class="vstack gap-3" novalidate>
+            <input class="form-control" name="display_name" minlength="2" placeholder="Name" required>
+            <input type="email" class="form-control" name="email" placeholder="E-Mail-Adresse" required>
+            <input type="password" class="form-control" name="password" placeholder="Passwort mit mindestens 10 Zeichen" minlength="10" required>
+            <select class="form-select" name="role">
+              <option value="reader">Leser</option>
+              {% if g.user['is_admin'] %}
+                <option value="creator">Ersteller</option>
+                <option value="admin">Admin</option>
+              {% endif %}
+            </select>
+            <button class="btn btn-primary">Benutzer speichern</button>
+          </form>
+        </div>
+      </div>
+      <div class="col-xl-7">
+        <div class="page-shell p-4 h-100">
+          <div class="section-label mb-2">Freigaben</div>
+          <h2 class="h4 mb-3">Zugriff für Ihren Nachlass vergeben</h2>
+          <form method="post" action="{{ url_for('create_grant') }}" class="row g-3" novalidate>
+            <div class="col-md-6">
+              <label class="form-label">Empfänger</label>
+              <select class="form-select" name="grantee_user_id" required>
+                {% for user in users %}
+                  {% if user['id'] != g.user['id'] %}
+                    <option value="{{ user['id'] }}">{{ user['display_name'] }} · {{ user['email'] }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Freigabeumfang</label>
+              <select class="form-select" name="category_key">
+                <option value="">Gesamter Nachlass</option>
+                {% for key, label in APP_CATEGORIES %}
+                  <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <button class="btn btn-primary">Freigabe speichern</button>
+            </div>
+          </form>
+          <hr class="my-4">
+          <div class="surface-table">
+            <div class="table-responsive">
+              <table class="table align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Empfänger</th>
+                    <th>Umfang</th>
+                    <th>Seit</th>
+                    <th class="text-end">Aktion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for grant in grants %}
+                    <tr>
+                      <td>{{ grant['grantee_name'] }}<div class="small text-secondary">{{ grant['grantee_email'] }}</div></td>
+                      <td>{{ category_label(grant['category_key']) if grant['category_key'] else 'Gesamter Nachlass' }}</td>
+                      <td class="small">{{ grant['created_at'].replace('T', ' ') }}</td>
+                      <td class="text-end">
+                        <form method="post" action="{{ url_for('delete_grant', grant_id=grant['id']) }}">
+                          <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Freigabe entfernen?')">Entfernen</button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="4" class="text-secondary">Noch keine Freigaben vorhanden.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-shell p-4 mb-4">
+      <div class="section-label mb-2">Bestehende Konten</div>
+      <h2 class="h4 mb-3">Benutzerübersicht</h2>
+      <div class="surface-table">
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Name</th>
+                <th>Rolle</th>
+                <th>Status</th>
+                <th class="text-end">Aktion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in users %}
+                <tr>
+                  <td>{{ user['display_name'] }}<div class="small text-secondary">{{ user['email'] }}</div></td>
+                  <td>{% if user['is_admin'] %}Admin{% elif user['is_creator'] %}Ersteller{% else %}Leser{% endif %}</td>
+                  <td>{{ 'Aktiv' if user['active'] else 'Deaktiviert' }}</td>
+                  <td class="text-end">
+                    {% if user['id'] != g.user['id'] %}
+                      <form method="post" action="{{ url_for('toggle_user_status', user_id=user['id']) }}">
+                        <button class="btn btn-outline-secondary btn-sm">{{ 'Aktivieren' if not user['active'] else 'Deaktivieren' }}</button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="page-shell p-4">
+    <div class="section-label mb-2">Audit-Log</div>
+    <h2 class="h4 mb-3">Nachvollziehbare Zugriffe und Änderungen</h2>
+    <div class="surface-table">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Zeit</th>
+              <th>Akteur</th>
+              <th>Aktion</th>
+              <th>Pfad</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+              <tr>
+                <td class="small">{{ log['created_at'].replace('T', ' ') }}</td>
+                <td>{{ log['actor_name'] }}</td>
+                <td>{{ log['detail'] }}</td>
+                <td class="small">{{ log['request_path'] }}</td>
+                <td class="small">{{ log['ip_address'] }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-secondary">Noch keine Logeinträge vorhanden.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}

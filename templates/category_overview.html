@@ -1,0 +1,124 @@
+{% extends "layout.html" %}
+{% block title %}{{ category_label(category_key) }}{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5 mb-4">
+    <div class="d-flex flex-column flex-xl-row justify-content-between gap-3 mb-4">
+      <div>
+        <p class="section-label mb-2">Kategorieansicht</p>
+        <h1 class="h3 mb-1">{{ category_label(category_key) }}</h1>
+        <p class="text-secondary mb-0">{{ profile['title'] }} · Alles für diese Kategorie an einem Ort</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{{ url_for('profile_dashboard', slug=profile['slug']) }}">Zur Übersicht</a>
+        {% if g.user['id'] == profile['owner_user_id'] %}
+          <a class="btn btn-primary" href="{{ url_for('record_create', slug=profile['slug'], category_key=category_key) }}">Neuen Eintrag</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="pill-nav">
+      {% for key, label in APP_CATEGORIES %}
+        {% if has_category_access(g.user, profile['id'], key) %}
+          <a href="{{ url_for('category_overview', slug=profile['slug'], category_key=key) }}" class="{% if key == category_key %}is-active{% endif %}">{{ label }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-xl-8">
+      <div class="page-shell p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <div class="section-label mb-2">Einträge</div>
+            <h2 class="h4 mb-0">Gespeicherte Informationen</h2>
+          </div>
+        </div>
+        <div class="surface-table">
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Titel</th>
+                  <th>Anbieter</th>
+                  <th>Benutzername</th>
+                  <th>Aktualisiert</th>
+                  <th class="text-end">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for record in records %}
+                  <tr>
+                    <td>
+                      <div class="fw-semibold">{{ record['title'] }}</div>
+                      <div class="small text-secondary">{{ record['reference_number'] or record['location_info'] or 'Kein Zusatzhinweis' }}</div>
+                    </td>
+                    <td>{{ record['provider'] or '–' }}</td>
+                    <td>{{ record['account_username'] or '–' }}</td>
+                    <td class="small">{{ record['updated_at'].replace('T', ' ') }}</td>
+                    <td class="text-end">
+                      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reveal_secret', slug=profile['slug'], category_key=category_key, record_id=record['id']) }}">Details</a>
+                      {% if g.user['id'] == profile['owner_user_id'] %}
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('record_edit', slug=profile['slug'], category_key=category_key, record_id=record['id']) }}">Bearbeiten</a>
+                        <form method="post" action="{{ url_for('record_delete', slug=profile['slug'], category_key=category_key, record_id=record['id']) }}" class="d-inline">
+                          <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Eintrag wirklich löschen?')">Löschen</button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="5" class="text-secondary">Noch keine Einträge vorhanden.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-4">
+      <div class="page-shell p-4">
+        <div class="section-label mb-2">Dokumente</div>
+        <h2 class="h4 mb-3">Dateien & Uploads</h2>
+        {% if g.user['id'] == profile['owner_user_id'] %}
+          <form method="post" action="{{ url_for('upload_document', slug=profile['slug']) }}" enctype="multipart/form-data" class="vstack gap-3 mb-4">
+            <input type="hidden" name="category_key" value="{{ category_key }}">
+            <div>
+              <label class="form-label">Dokumenttitel</label>
+              <input class="form-control" name="title" minlength="3" placeholder="z. B. Versicherungspolice">
+            </div>
+            <div>
+              <label class="form-label">Beschreibung</label>
+              <textarea class="form-control" name="description" rows="3" placeholder="Kurzer Hinweis zum Inhalt"></textarea>
+            </div>
+            <div>
+              <label class="form-label">Datei auswählen</label>
+              <input class="form-control" type="file" name="document" required>
+              <div class="form-text">Erlaubt: PDF, Bilder und Office-Dateien bis 20 MB.</div>
+            </div>
+            <button class="btn btn-primary btn-sm">Dokument hochladen</button>
+          </form>
+        {% endif %}
+        <div class="vstack gap-3">
+          {% for document in documents %}
+            <div class="subtle-card p-3">
+              <div class="fw-semibold">{{ document['title'] }}</div>
+              <div class="small text-secondary mb-2">{{ document['original_name'] }}</div>
+              {% if document['description'] %}
+                <div class="small mb-3">{{ document['description'] }}</div>
+              {% endif %}
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_document', slug=profile['slug'], document_id=document['id']) }}">Download</a>
+                {% if g.user['id'] == profile['owner_user_id'] %}
+                  <form method="post" action="{{ url_for('delete_document', slug=profile['slug'], document_id=document['id']) }}">
+                    <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Dokument wirklich löschen?')">Löschen</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          {% else %}
+            <div class="empty-state p-4 text-center text-secondary">Noch keine Dokumente hochgeladen.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

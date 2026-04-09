@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block title %}{{ title }} · Aeterna{% endblock %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="page-shell p-5 text-center">
+        <img src="{{ url_for('logo_asset') }}" alt="Aeterna Logo" class="auth-brand mb-4">
+        <p class="section-label mb-2 justify-content-center">Aeterna</p>
+        <h1 class="h2 mb-3">{{ title }}</h1>
+        <p class="text-secondary mb-4">{{ message }}</p>
+        <a class="btn btn-primary" href="{{ url_for('dashboard') if g.user else url_for('login') }}">Zurück zur sicheren Übersicht</a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

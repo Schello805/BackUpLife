@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ profile['title'] }} · Export</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      body { padding: 2rem; }
+      .page-break { page-break-before: always; }
+      @media print { .no-print { display: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="d-flex justify-content-between align-items-start mb-4 no-print">
+      <div>
+        <h1 class="h3 mb-1">{{ profile['title'] }}</h1>
+        <div class="text-secondary">Druckansicht für Nachlassunterlagen</div>
+      </div>
+      <button class="btn btn-primary" onclick="window.print()">Jetzt drucken</button>
+    </div>
+    <h1 class="h2">{{ profile['title'] }}</h1>
+    <p class="text-secondary">Persönliche URL: /hinweis/{{ profile['slug'] }}</p>
+
+    {% for category in categories %}
+      <section class="mt-5 {% if not loop.first %}page-break{% endif %}">
+        <h2 class="h4 mb-3">{{ category.label }}</h2>
+        {% if category.records %}
+          {% for record in category.records %}
+            <div class="border rounded p-3 mb-3">
+              <h3 class="h5">{{ record['title'] }}</h3>
+              <p class="mb-1"><strong>Anbieter:</strong> {{ record['provider'] or '–' }}</p>
+              <p class="mb-1"><strong>Website:</strong> {{ record['website'] or '–' }}</p>
+              <p class="mb-1"><strong>Benutzername:</strong> {{ record['account_username'] or '–' }}</p>
+              <p class="mb-1"><strong>Passwort:</strong> {{ decrypt_secret(record['secret_encrypted']) or '–' }}</p>
+              <p class="mb-1"><strong>Referenz:</strong> {{ record['reference_number'] or '–' }}</p>
+              <p class="mb-1"><strong>Ort:</strong> {{ record['location_info'] or '–' }}</p>
+              <p class="mb-1"><strong>Kontakt:</strong> {{ record['contact_info'] or '–' }}</p>
+              <p class="mb-1"><strong>Details:</strong> {{ record['details'] or '–' }}</p>
+              <p class="mb-0"><strong>Notizen:</strong> {{ record['notes'] or '–' }}</p>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-secondary">Keine Einträge vorhanden.</p>
+        {% endif %}
+        <h3 class="h5 mt-4">Dokumente</h3>
+        <ul>
+          {% for document in category.documents %}
+            <li>{{ document['title'] }} · {{ document['original_name'] }}</li>
+          {% else %}
+            <li>Keine Dokumente hinterlegt.</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endfor %}
+
+    <section class="mt-5 page-break">
+      <h2 class="h4 mb-3">Letzte Wünsche</h2>
+      <p><strong>Persönliche Nachricht:</strong><br>{{ wishes['farewell_message'] or '–' }}</p>
+      <p><strong>Eigentum / Verteilung:</strong><br>{{ wishes['asset_notes'] or '–' }}</p>
+      <p><strong>Abschied / Organisation:</strong><br>{{ wishes['ceremony_notes'] or '–' }}</p>
+      <p><strong>Wichtige Kontakte:</strong><br>{{ wishes['important_contacts'] or '–' }}</p>
+      <p><strong>Externe Links:</strong><br>{{ wishes['external_links'] or '–' }}</p>
+    </section>
+  </body>
+</html>

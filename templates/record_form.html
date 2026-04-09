@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block title %}{% if record %}Eintrag bearbeiten{% else %}Eintrag anlegen{% endif %}{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <p class="section-label mb-2">{{ category_label(category_key) }}</p>
+        <h1 class="h3 mb-2">{% if record %}Eintrag bearbeiten{% else %}Neuen Eintrag anlegen{% endif %}</h1>
+        <p class="text-secondary mb-0">Speichern Sie nur die Informationen, die für Angehörige später wirklich hilfreich sind.</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category_key) }}">Zurück</a>
+    </div>
+    {% set values = form_values if form_values else record %}
+    <form method="post" class="row g-3" novalidate>
+      <div class="col-md-6">
+        <label class="form-label">Titel</label>
+        <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Anbieter / Vertragspartner</label>
+        <input class="form-control" name="provider" maxlength="120" value="{{ values['provider'] if values else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Website / URL</label>
+        <input class="form-control" name="website" inputmode="url" placeholder="https://..." value="{{ values['website'] if values else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Benutzername</label>
+        <input class="form-control" name="account_username" maxlength="120" value="{{ values['account_username'] if values else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Passwort / Geheimnis</label>
+        <input class="form-control" name="account_password" minlength="4" value="{{ secret_value }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Referenznummer</label>
+        <input class="form-control" name="reference_number" maxlength="120" value="{{ values['reference_number'] if values else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Ort / Aufbewahrung</label>
+        <input class="form-control" name="location_info" maxlength="180" value="{{ values['location_info'] if values else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Kontakt / Hotline</label>
+        <input class="form-control" name="contact_info" maxlength="180" value="{{ values['contact_info'] if values else '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Details</label>
+        <textarea class="form-control" name="details" rows="4" maxlength="4000">{{ values['details'] if values else '' }}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Notizen</label>
+        <textarea class="form-control" name="notes" rows="4" maxlength="4000">{{ values['notes'] if values else '' }}</textarea>
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="is_2fa_enabled" id="is_2fa_enabled" {% if values and values['is_2fa_enabled'] %}checked{% endif %}>
+          <label class="form-check-label" for="is_2fa_enabled">Zusätzlicher Schutz wie 2FA ist aktiviert</label>
+        </div>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary">Speichern</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category_key) }}">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

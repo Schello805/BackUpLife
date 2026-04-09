@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block title %}Login · Aeterna{% endblock %}
+{% block content %}
+  <div class="auth-wrapper">
+    <div class="row g-4 align-items-center w-100">
+      <div class="col-lg-7">
+        <div class="hero-panel p-4 p-lg-5">
+          <div class="d-flex align-items-center gap-4 mb-4">
+            <img src="{{ url_for('logo_asset') }}" alt="Aeterna Logo" class="auth-brand">
+            <div>
+              <p class="section-label mb-2">Sicher. Ernsthaft. Familiengeeignet.</p>
+              <h1 class="display-6 fw-semibold mb-3">Digitaler Nachlass ohne Chaos für Angehörige.</h1>
+              <p class="mb-0 text-white-50">Aeterna bündelt Zugangsdaten, Verträge, Versicherungen, Dokumente und letzte Wünsche in einer klaren, nachvollziehbaren Struktur mit Freigaben und Audit-Log.</p>
+            </div>
+          </div>
+          <ul class="hint-list ps-0 mb-0">
+            <li>Eigene URL pro Ersteller für Hinweise in Geldbörse oder Unterlagen</li>
+            <li>Leserzugriff pro Nachlass oder nur für einzelne Kategorien</li>
+            <li>Verlässliche Rückmeldungen bei jeder Aktion über Toast-Benachrichtigungen</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="page-shell p-4 p-lg-5">
+          <p class="section-label mb-2">Anmeldung</p>
+          <h2 class="h3 mb-3">Willkommen zurück</h2>
+          <p class="text-secondary mb-4">Bitte melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an.</p>
+          {% if target_slug %}
+            <div class="info-chip mb-3">Ziel-Nachlass: {{ target_slug }}</div>
+          {% endif %}
+          <form method="post" class="vstack gap-3" novalidate>
+            <div>
+              <label class="form-label">E-Mail-Adresse</label>
+              <input type="email" class="form-control" name="email" autocomplete="username" required>
+            </div>
+            <div>
+              <label class="form-label">Passwort</label>
+              <input type="password" class="form-control" name="password" autocomplete="current-password" required>
+            </div>
+            <button class="btn btn-primary">Jetzt anmelden</button>
+          </form>
+          <div class="mt-4 d-flex flex-wrap justify-content-between gap-2 small">
+            <a href="{{ url_for('forgot_password') }}">Passwort vergessen?</a>
+            <span class="text-secondary">Nur Deutsch · Responsiv mit Bootstrap</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

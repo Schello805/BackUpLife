@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}Letzte Wünsche{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <p class="section-label mb-2">Letzte Wünsche</p>
+        <h1 class="h3 mb-2">{{ profile['title'] }}</h1>
+        <p class="text-secondary mb-0">Hier stehen persönliche Hinweise, die nicht zwischen Verträgen und Zugangsdaten untergehen sollen.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{{ url_for('profile_dashboard', slug=profile['slug']) }}">Zurück zum Nachlass</a>
+        <a class="btn btn-primary" href="{{ url_for('export_profile', slug=profile['slug']) }}">Druckansicht</a>
+      </div>
+    </div>
+    <form method="post" class="row g-4" novalidate>
+      <div class="col-lg-6">
+        <label class="form-label">Persönliche Nachricht</label>
+        <textarea class="form-control" name="farewell_message" rows="8" maxlength="4000" {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['farewell_message'] }}</textarea>
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label">Eigentum / Verteilungshinweise</label>
+        <textarea class="form-control" name="asset_notes" rows="8" maxlength="4000" {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['asset_notes'] }}</textarea>
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label">Organisation / Abschiedsfeier</label>
+        <textarea class="form-control" name="ceremony_notes" rows="6" maxlength="4000" {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['ceremony_notes'] }}</textarea>
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label">Wichtige Kontakte</label>
+        <textarea class="form-control" name="important_contacts" rows="6" maxlength="4000" {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['important_contacts'] }}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Externe Links</label>
+        <textarea class="form-control" name="external_links" rows="4" maxlength="4000" {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['external_links'] }}</textarea>
+      </div>
+      {% if g.user['id'] == profile['owner_user_id'] %}
+        <div class="col-12">
+          <button class="btn btn-primary">Änderungen speichern</button>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+{% endblock %}

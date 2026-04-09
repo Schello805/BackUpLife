@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block title %}{{ profile['title'] }}{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5 mb-4">
+    <div class="d-flex flex-column flex-xl-row justify-content-between gap-3 mb-4">
+      <div>
+        <p class="section-label mb-2">Digitaler Nachlass</p>
+        <h1 class="h3 mb-2">{{ profile['title'] }}</h1>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="info-chip">Eigentümer: {{ profile['owner_name'] }}</span>
+          <span class="info-chip">Hinweis-URL: /hinweis/{{ profile['slug'] }}</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{{ url_for('export_profile', slug=profile['slug']) }}">Druckansicht</a>
+        <a class="btn btn-primary" href="{{ url_for('wishes_page', slug=profile['slug']) }}">Letzte Wünsche</a>
+      </div>
+    </div>
+    <div class="pill-nav">
+      {% for category in categories %}
+        {% if has_category_access(g.user, profile['id'], category.key) %}
+          <a href="{{ url_for('category_overview', slug=profile['slug'], category_key=category.key) }}">{{ category.label }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    {% for category in categories %}
+      {% if has_category_access(g.user, profile['id'], category.key) %}
+        <div class="col-md-6 col-xl-4">
+          <div class="metric-card p-4 h-100">
+            <div class="section-label mb-2">{{ loop.index|string.zfill(2) }}</div>
+            <h2 class="h5 mb-2">{{ category.label }}</h2>
+            <p class="text-secondary small mb-4">{{ category.records_count }} Einträge und {{ category.documents_count }} Dokumente sind in dieser Kategorie vorhanden.</p>
+            <a class="btn btn-primary btn-sm mt-auto" href="{{ url_for('category_overview', slug=profile['slug'], category_key=category.key) }}">Kategorie öffnen</a>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endblock %}

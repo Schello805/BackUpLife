@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block title %}Ersteinrichtung · Aeterna{% endblock %}
+{% block content %}
+  <div class="auth-wrapper">
+    <div class="row g-4 align-items-center w-100">
+      <div class="col-lg-7">
+        <div class="hero-panel p-4 p-lg-5">
+          <div class="d-flex align-items-center gap-4 mb-4">
+            <img src="{{ url_for('logo_asset') }}" alt="Aeterna Logo" class="auth-brand">
+            <div>
+              <p class="section-label mb-2">Erstkonfiguration</p>
+              <h1 class="display-6 fw-semibold mb-3">Richten Sie Aeterna für Ihre Familie ein.</h1>
+              <p class="mb-0 text-white-50">Zum Start wird nur ein Konto benötigt: Ihr Admin-Konto. Dieses ist gleichzeitig Ihr eigener Ersteller-Zugang und verwaltet später System, SMTP und Ihren persönlichen Nachlassbereich.</p>
+            </div>
+          </div>
+          <ul class="hint-list ps-0 mb-0">
+            <li>Kein Demo-Admin und keine Testdaten mehr im System</li>
+            <li>Automatische persönliche Nachlass-URL nach der Einrichtung</li>
+            <li>Spätere Leser- und Erstellerkonten werden erst im Verwaltungsbereich angelegt</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="page-shell p-4 p-lg-5">
+          <p class="section-label mb-2">Los geht's</p>
+          <h2 class="h3 mb-3">Admin-Konto anlegen</h2>
+          <form method="post" class="vstack gap-3" novalidate>
+            <div>
+              <label class="form-label">Ihr Name</label>
+              <input class="form-control" name="display_name" minlength="2" required>
+            </div>
+            <div>
+              <label class="form-label">E-Mail-Adresse</label>
+              <input type="email" class="form-control" name="email" required>
+            </div>
+            <div>
+              <label class="form-label">Passwort</label>
+              <input type="password" class="form-control" name="password" minlength="10" required>
+            </div>
+            <div>
+              <label class="form-label">Passwort wiederholen</label>
+              <input type="password" class="form-control" name="password_confirm" minlength="10" required>
+            </div>
+            <button class="btn btn-primary">Aeterna einrichten</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

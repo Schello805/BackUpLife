@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Aeterna{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('logo_asset') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <div class="app-shell">
+      {% if g.user %}
+        <nav class="navbar navbar-expand-lg topbar no-print">
+          <div class="container py-3">
+            <a class="brand-lockup" href="{{ url_for('dashboard') }}">
+              <img src="{{ url_for('logo_asset') }}" alt="Aeterna Logo" class="brand-logo">
+              <div class="brand-wordmark">
+                <strong>Aeterna</strong>
+                <span>Digitaler Nachlass</span>
+              </div>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+              <ul class="navbar-nav mx-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                {% if active_profile %}
+                  <li class="nav-item"><a class="nav-link {% if request.endpoint in ['profile_dashboard', 'category_overview', 'record_create', 'record_edit', 'reveal_secret'] %}active{% endif %}" href="{{ url_for('profile_dashboard', slug=active_profile['slug']) }}">Digitaler Nachlass</a></li>
+                  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'wishes_page' %}active{% endif %}" href="{{ url_for('wishes_page', slug=active_profile['slug']) }}">Letzte Wünsche</a></li>
+                {% endif %}
+                <li class="nav-item"><a class="nav-link {% if request.endpoint == 'management' %}active{% endif %}" href="{{ url_for('management') }}">Verwaltung</a></li>
+              </ul>
+              <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2 gap-lg-3">
+                {% if visible_profiles|length > 1 %}
+                  <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                      {% if active_profile %}{{ active_profile['owner_name'] }}{% else %}Nachlass wählen{% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% for profile in visible_profiles %}
+                        <li><a class="dropdown-item" href="{{ url_for('profile_dashboard', slug=profile['slug']) }}">{{ profile['owner_name'] }} · {{ profile['slug'] }}</a></li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+                <div class="text-lg-end small">
+                  <div class="fw-semibold">{{ g.user['display_name'] }}</div>
+                  <div class="text-secondary">{{ current_user_role()|upper }}</div>
+                </div>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Abmelden</a>
+              </div>
+            </div>
+          </div>
+        </nav>
+      {% endif %}
+
+      <div class="toast-container position-fixed top-0 end-0 p-3 no-print">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, payload in messages %}
+              <div class="toast {{ category }} show" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                <div class="toast-header">
+                  <strong class="me-auto">{{ payload.title }}</strong>
+                  <small>{{ category|upper }}</small>
+                  <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">{{ payload.message }}</div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      <main class="container py-4 py-lg-5">
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="container pb-4 footer-shell no-print">
+        <div class="page-shell px-4 py-3 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+          <div class="d-flex align-items-center gap-3">
+            <img src="{{ url_for('logo_asset') }}" alt="" class="brand-logo">
+            <div class="small">
+              <div class="fw-semibold">Aeterna</div>
+              <div class="text-secondary">Sichere Verwaltung eines digitalen Nachlasses mit nachvollziehbaren Freigaben.</div>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-3 small">
+            {% if g.user and g.user['is_admin'] %}
+              <a href="{{ url_for('admin') }}" class="link-secondary">Admin</a>
+            {% endif %}
+            <a href="https://www.affilio.de" target="_blank" rel="noreferrer" class="link-secondary">Affilio</a>
+            <span>Impressum</span>
+            <span>Datenschutz</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      document.querySelectorAll('.toast').forEach((element) => {
+        const toast = new bootstrap.Toast(element);
+        toast.show();
+      });
+    </script>
+  </body>
+</html>
