@@ -14,10 +14,6 @@
           {% endif %}
         </div>
       </div>
-      <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" href="{{ url_for('export_profile', slug=profile['slug']) }}" target="_blank" rel="noreferrer">Druckansicht</a>
-        <a class="btn btn-primary" href="{{ url_for('wishes_page', slug=profile['slug']) }}">Letzte Wünsche</a>
-      </div>
     </div>
     <div class="pill-nav">
       {% for category in categories %}
@@ -38,34 +34,38 @@
             <p class="text-secondary small mb-4">Hier liegen die Informationen, die Angehörige später nicht erst zusammensuchen sollten: aktuell {{ category.records_count }} Einträge und {{ category.documents_count }} Dokumente.</p>
             <div class="d-flex flex-wrap gap-2 mb-3">
               {% if category.status_state == 'na' %}
-                <span class="badge text-bg-secondary">Nicht zutreffend</span>
+                <span class="status-chip status-na">Nicht zutreffend</span>
               {% elif category.status_state == 'complete' %}
-                <span class="badge text-bg-success">Fertig</span>
+                <span class="status-chip status-complete">Fertig</span>
               {% elif category.status_state == 'started' %}
-                <span class="badge text-bg-info">Begonnen</span>
+                <span class="status-chip status-started">Begonnen</span>
               {% else %}
-                <span class="badge text-bg-light text-dark">Offen</span>
+                <span class="status-chip status-open">Offen</span>
               {% endif %}
               {% if g.user['id'] == profile['owner_user_id'] %}
                 {% if category.status_state == 'na' %}
                   <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
                     <input type="hidden" name="action" value="applicable">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
                     <button class="btn btn-outline-secondary btn-sm">Wieder relevant</button>
                   </form>
                 {% else %}
                   {% if category.is_complete %}
                     <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
                       <input type="hidden" name="action" value="open">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button class="btn btn-outline-secondary btn-sm">Als offen</button>
                     </form>
                   {% else %}
                     <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
                       <input type="hidden" name="action" value="complete">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button class="btn btn-outline-secondary btn-sm">Als fertig</button>
                     </form>
                   {% endif %}
                   <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category.key) }}">
                     <input type="hidden" name="action" value="na">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
                     <button class="btn btn-outline-secondary btn-sm">Nicht zutreffend</button>
                   </form>
                 {% endif %}

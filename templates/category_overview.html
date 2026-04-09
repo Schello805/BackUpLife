@@ -35,7 +35,7 @@
                 <div class="fw-semibold">{{ category_status.label }}</div>
                 <div class="small text-secondary">
                   {% if category_status.updated_at %}
-                    Zuletzt geändert: {{ category_status.updated_at.replace('T', ' ') }}
+                    Zuletzt geändert: {{ dt_de(category_status.updated_at) }}
                   {% else %}
                     Noch nicht bewertet. Optional: Markieren Sie Kategorien als fertig oder nicht zutreffend.
                   {% endif %}
@@ -45,22 +45,26 @@
                 {% if category_status.state == 'na' %}
                   <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
                     <input type="hidden" name="action" value="applicable">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
                     <button class="btn btn-outline-secondary btn-sm">Wieder relevant</button>
                   </form>
                 {% else %}
                   {% if category_status.is_complete %}
                     <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
                       <input type="hidden" name="action" value="open">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button class="btn btn-outline-secondary btn-sm">Als offen</button>
                     </form>
                   {% else %}
                     <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
                       <input type="hidden" name="action" value="complete">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button class="btn btn-outline-secondary btn-sm">Als fertig</button>
                     </form>
                   {% endif %}
                   <form method="post" action="{{ url_for('update_category_status', slug=profile['slug'], category_key=category_key) }}">
                     <input type="hidden" name="action" value="na">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
                     <button class="btn btn-outline-secondary btn-sm">Nicht zutreffend</button>
                   </form>
                 {% endif %}
@@ -131,7 +135,7 @@
                     </td>
                     <td>{{ record['provider'] or '–' }}</td>
                     <td>{{ record['account_username'] or '–' }}</td>
-                    <td class="small">{{ record['updated_at'].replace('T', ' ') }}</td>
+                    <td class="small">{{ dt_de(record['updated_at']) }}</td>
                     <td class="text-end">
                       <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reveal_secret', slug=profile['slug'], category_key=category_key, record_id=record['id']) }}">Details</a>
                       {% if g.user['id'] == profile['owner_user_id'] %}

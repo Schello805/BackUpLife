@@ -17,9 +17,30 @@
     </div>
   </div>
   <div class="page-shell p-4 p-lg-5">
+    <div class="section-label mb-2">System</div>
+    <h2 class="h4 mb-3">Zeit & Anzeigeformat</h2>
+    <form method="post" class="row g-3 mb-5" novalidate>
+      <input type="hidden" name="form_id" value="system">
+      <div class="col-md-6">
+        <label class="form-label">Zeitzone</label>
+        <input class="form-control" name="timezone" value="{{ app_settings['timezone'] if app_settings else 'Europe/Berlin' }}" list="timezoneList" placeholder="z. B. Europe/Berlin">
+        <datalist id="timezoneList">
+          <option value="Europe/Berlin"></option>
+          <option value="Europe/Vienna"></option>
+          <option value="Europe/Zurich"></option>
+          <option value="UTC"></option>
+        </datalist>
+        <div class="form-text">Wir speichern Zeitstempel in UTC, zeigen sie aber in dieser Zeitzone im Format <strong>TT.MM.JJJJ 24h</strong> an.</div>
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2">
+        <button class="btn btn-primary" type="submit">System speichern</button>
+      </div>
+    </form>
+
     <div class="section-label mb-2">SMTP</div>
     <h2 class="h4 mb-3">E-Mails verlässlich versenden</h2>
     <form method="post" class="row g-3" novalidate>
+      <input type="hidden" name="form_id" value="smtp">
       <div class="col-md-6">
         <label class="form-label">Host</label>
         <input class="form-control" name="host" value="{{ smtp_settings['host'] }}">

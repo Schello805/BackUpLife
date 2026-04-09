@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from cryptography.fernet import Fernet, InvalidToken
 from flask import (
@@ -139,6 +140,35 @@ def utcnow() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def get_app_timezone_name() -> str:
+    row = g.db.execute("SELECT timezone FROM app_settings WHERE id = 1").fetchone()
+    value = (row["timezone"] if row else "") or "Europe/Berlin"
+    return value
+
+
+def get_app_timezone() -> ZoneInfo:
+    name = getattr(g, "app_timezone_name", None) or "Europe/Berlin"
+    try:
+        return ZoneInfo(name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def dt_de(iso_value: str | None) -> str:
+    if not iso_value:
+        return "–"
+    try:
+        dt = datetime.fromisoformat(iso_value)
+    except ValueError:
+        return iso_value
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    tz = getattr(g, "app_timezone", None)
+    if tz:
+        dt = dt.astimezone(tz)
+    return dt.strftime("%d.%m.%Y %H:%M")
+
+
 def load_env_file() -> None:
     env_path = BASE_DIR / ".env"
     if not env_path.exists():
@@ -173,12 +203,18 @@ def create_app() -> Flask:
     app.jinja_env.globals["current_user_role"] = current_user_role
     app.jinja_env.globals["decrypt_secret"] = decrypt_secret
     app.jinja_env.globals["LEGAL_CONTACT"] = LEGAL_CONTACT
+    app.jinja_env.globals["dt_de"] = dt_de
 
     @app.before_request
     def before_request() -> None:
         g.db = get_db(app)
         g.system_initialized = is_system_initialized()
         g.user = get_current_user()
+        try:
+            g.app_timezone_name = get_app_timezone_name()
+        except sqlite3.Error:
+            g.app_timezone_name = "Europe/Berlin"
+        g.app_timezone = get_app_timezone()
         allowed_endpoints = {
             "login",
             "register",
@@ -321,6 +357,12 @@ def init_db(app: Flask) -> None:
         updated_by INTEGER,
         updated_at TEXT NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS app_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        timezone TEXT NOT NULL DEFAULT 'Europe/Berlin',
+        updated_by INTEGER,
+        updated_at TEXT NOT NULL DEFAULT ''
+    );
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -361,6 +403,7 @@ def init_db(app: Flask) -> None:
     db = get_db(app)
     db.executescript(schema)
     db.execute("INSERT OR IGNORE INTO smtp_settings (id, updated_at) VALUES (1, '')")
+    db.execute("INSERT OR IGNORE INTO app_settings (id, timezone, updated_at) VALUES (1, 'Europe/Berlin', '')")
     db.commit()
     db.close()
 
@@ -1384,6 +1427,9 @@ def register_routes(app: Flask) -> None:
         g.db.commit()
         log_event("category_status_update", "status", f"Status {category_key}: {action}", profile["id"])
         push_toast(toast, "success", "Status aktualisiert")
+        next_url = (request.form.get("next") or "").strip()
+        if next_url.startswith("/"):
+            return redirect(next_url)
         return redirect(url_for("category_overview", slug=slug, category_key=category_key))
 
     @app.route("/digitaler-nachlass/<slug>/<category_key>/neu", methods=["GET", "POST"])
@@ -1880,7 +1926,25 @@ def register_routes(app: Flask) -> None:
     @admin_required
     def admin():
         smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
+        app_settings = g.db.execute("SELECT * FROM app_settings WHERE id = 1").fetchone()
         if request.method == "POST":
+            form_id = (request.form.get("form_id") or "smtp").strip()
+            if form_id == "system":
+                tz_name = (request.form.get("timezone") or "").strip() or "Europe/Berlin"
+                try:
+                    ZoneInfo(tz_name)
+                except ZoneInfoNotFoundError:
+                    push_toast("Die Zeitzone ist ungültig. Beispiel: Europe/Berlin", "danger", "System")
+                    return redirect(url_for("admin"))
+                g.db.execute(
+                    "UPDATE app_settings SET timezone = ?, updated_by = ?, updated_at = ? WHERE id = 1",
+                    (tz_name, g.user["id"], utcnow()),
+                )
+                g.db.commit()
+                log_event("system_update", "admin", f"Zeitzone gesetzt: {tz_name}")
+                push_toast("Systemeinstellungen wurden gespeichert.", "success", "System")
+                return redirect(url_for("admin"))
+
             errors = validate_smtp_form(request.form)
             if errors:
                 for error in errors:
@@ -1940,7 +2004,7 @@ def register_routes(app: Flask) -> None:
             "records": g.db.execute("SELECT COUNT(*) AS count FROM records").fetchone()["count"],
             "documents": g.db.execute("SELECT COUNT(*) AS count FROM documents").fetchone()["count"],
         }
-        return render_template("admin.html", smtp_settings=smtp_settings, stats=stats)
+        return render_template("admin.html", smtp_settings=smtp_settings, app_settings=app_settings, stats=stats)
 
     @app.context_processor
     def inject_context() -> dict[str, Any]:
