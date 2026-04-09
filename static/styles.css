@@ -441,18 +441,13 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 0.85rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
-.card-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.card-actions form {
-  margin: 0;
+@media (max-width: 420px) {
+  .card-controls-row {
+    flex-wrap: wrap;
+  }
 }
 
 .print-only {
