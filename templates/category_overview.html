@@ -15,13 +15,6 @@
         {% endif %}
       </div>
     </div>
-    <div class="pill-nav">
-      {% for key, label in APP_CATEGORIES %}
-        {% if has_category_access(g.user, profile['id'], key) %}
-          <a href="{{ url_for('category_overview', slug=profile['slug'], category_key=key) }}" class="{% if key == category_key %}is-active{% endif %}">{{ label }}</a>
-        {% endif %}
-      {% endfor %}
-    </div>
   </div>
 
   <div class="row g-4">

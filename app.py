@@ -481,6 +481,9 @@ def create_app() -> Flask:
     app.jinja_env.globals["format_bytes"] = format_bytes
     app.jinja_env.globals["csrf_token"] = get_csrf_token
     app.jinja_env.globals["csrf_input"] = csrf_input
+    # Stable version/project globals so templates keep working even if context_processor changes.
+    app.jinja_env.globals["APP_VERSION"] = APP_VERSION
+    app.jinja_env.globals["GITHUB_PROJECT_URL"] = GITHUB_PROJECT_URL
 
     @app.before_request
     def before_request() -> None:

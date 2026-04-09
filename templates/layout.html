@@ -122,7 +122,10 @@
           <div class="d-flex align-items-center gap-3">
             <img src="{{ url_for('logo_asset') }}" alt="" class="brand-logo">
             <div class="small">
-              <div class="fw-semibold">BackUpLife <span class="text-secondary">v{{ app_version }}</span>
+              <div class="fw-semibold">
+                BackUpLife
+                {% set version_value = app_version|default(APP_VERSION, true) %}
+                <span class="badge text-bg-light border ms-2">v{{ version_value }}</span>
                 {% if update_info and update_info.status == 'update_available' %}
                   <span class="badge text-bg-warning ms-2">Update verfügbar: {{ update_info.latest|replace('v','') }}</span>
                 {% elif update_info and update_info.status == 'up_to_date' %}
@@ -144,7 +147,7 @@
             <a href="{{ url_for('imprint') }}" class="link-secondary">Impressum</a>
             <a href="{{ url_for('privacy') }}" class="link-secondary">Datenschutz</a>
             <a href="{{ url_for('cookies_page') }}" class="link-secondary">Cookies</a>
-            <a href="{{ github_project_url }}" target="_blank" rel="noreferrer" class="link-secondary">GitHub</a>
+            <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}" target="_blank" rel="noreferrer" class="link-secondary">GitHub</a>
             {% if g.user and g.user['is_admin'] %}
               <a href="{{ url_for('admin') }}" class="link-secondary">Admin</a>
             {% endif %}
