@@ -3268,6 +3268,21 @@ self.addEventListener('fetch', (event) => {
             emergency_qr_svg=build_qr_svg(build_emergency_url(profile["slug"])),
         )
 
+    @app.route("/notfall/<slug>/karte")
+    def profile_emergency_card(slug: str):
+        profile, canonical_slug = resolve_profile_by_slug(slug)
+        if canonical_slug and canonical_slug != slug:
+            return redirect(url_for("profile_emergency_card", slug=canonical_slug))
+        if not profile:
+            abort(404)
+        emergency_url = build_emergency_url(profile["slug"])
+        return render_template(
+            "notfall_card.html",
+            profile=profile,
+            emergency_url=emergency_url,
+            emergency_qr_svg=build_qr_svg(emergency_url),
+        )
+
     @app.route("/admin", methods=["GET", "POST"])
     @login_required
     @admin_required

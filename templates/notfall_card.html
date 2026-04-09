@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ profile['title'] }} · Notfallkarte</title>
+    <link rel="icon" type="image/png" href="{{ url_for('logo_asset') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+      :root { color-scheme: light; }
+      body { background: #eef3f8; }
+
+      .card-page {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 2rem 1rem 3rem;
+      }
+
+      .print-hint {
+        background: rgba(255,255,255,0.9);
+        border: 1px solid rgba(16, 54, 84, 0.10);
+        border-radius: 1.25rem;
+        padding: 1rem 1.25rem;
+      }
+
+      .wallet-card {
+        width: 85.6mm;
+        height: 54mm;
+        border-radius: 3.2mm;
+        background: linear-gradient(135deg, rgba(16, 54, 84, 0.96), rgba(14, 106, 156, 0.92));
+        color: white;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 18px 44px rgba(12, 31, 48, 0.25);
+      }
+
+      .wallet-card::before {
+        content: "";
+        position: absolute;
+        inset: -40% -30% auto auto;
+        width: 240px;
+        height: 240px;
+        background: radial-gradient(circle at center, rgba(53, 189, 208, 0.35), transparent 60%);
+        transform: rotate(12deg);
+      }
+
+      .wallet-inner {
+        position: relative;
+        z-index: 1;
+        height: 100%;
+        padding: 4.2mm;
+        display: grid;
+        grid-template-columns: 1fr 22mm;
+        grid-template-rows: auto 1fr auto;
+        gap: 2.8mm;
+      }
+
+      .wallet-brand {
+        display: flex;
+        align-items: center;
+        gap: 2.4mm;
+      }
+
+      .wallet-brand img {
+        width: 9mm;
+        height: 9mm;
+        border-radius: 2.4mm;
+        background: rgba(255,255,255,0.10);
+        padding: 1.2mm;
+      }
+
+      .wallet-brand strong {
+        font-size: 3.4mm;
+        letter-spacing: 0.08em;
+      }
+
+      .wallet-brand span {
+        display: block;
+        font-size: 2.6mm;
+        opacity: 0.85;
+        margin-top: 0.4mm;
+      }
+
+      .wallet-title {
+        grid-column: 1 / 2;
+        margin-top: 1mm;
+      }
+
+      .wallet-title .label {
+        font-size: 2.4mm;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0.85;
+      }
+
+      .wallet-title .name {
+        font-size: 4.2mm;
+        font-weight: 700;
+        line-height: 1.1;
+        margin-top: 1mm;
+      }
+
+      .wallet-qr {
+        grid-column: 2 / 3;
+        grid-row: 1 / 4;
+        align-self: end;
+        justify-self: end;
+        width: 22mm;
+        height: 22mm;
+        background: white;
+        border-radius: 2.6mm;
+        padding: 2.2mm;
+        box-shadow: inset 0 0 0 1px rgba(16, 54, 84, 0.08);
+      }
+
+      .wallet-qr svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .wallet-url {
+        grid-column: 1 / 2;
+        align-self: end;
+      }
+
+      .wallet-url .hint {
+        font-size: 2.5mm;
+        opacity: 0.88;
+        margin-bottom: 1.2mm;
+      }
+
+      .wallet-url .url {
+        font-size: 2.35mm;
+        line-height: 1.15;
+        word-break: break-all;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: 2.2mm;
+        padding: 1.4mm 1.8mm;
+      }
+
+      .wallet-note {
+        grid-column: 1 / 2;
+        font-size: 2.2mm;
+        opacity: 0.78;
+      }
+
+      @media print {
+        @page { size: 85.6mm 54mm; margin: 0; }
+        body { background: white; }
+        .card-page { padding: 0; margin: 0; max-width: none; }
+        .print-hint { display: none !important; }
+        .wallet-card { box-shadow: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card-page">
+      <div class="print-hint mb-4 no-print">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-center">
+          <div>
+            <div class="fw-semibold">Notfallkarte (Scheckkartengröße)</div>
+            <div class="small text-secondary">Druck-Tipp: im Druckdialog „Skalierung 100%“ oder „Tatsächliche Größe“ wählen. Dann passt es in 85,6 x 54 mm.</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" onclick="window.print()">Jetzt drucken</button>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('profile_emergency', slug=profile['slug']) }}">Zur Notfallseite</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="wallet-card mx-auto">
+        <div class="wallet-inner">
+          <div class="wallet-brand">
+            <img src="{{ url_for('logo_asset') }}" alt="">
+            <div>
+              <strong>BackUpLife</strong>
+              <span>Notfallkarte</span>
+            </div>
+          </div>
+
+          <div class="wallet-title">
+            <div class="label">NOTFALL LINK</div>
+            <div class="name">{{ profile['title'] }}</div>
+          </div>
+
+          <div class="wallet-note">
+            QR scannen oder Link eingeben. Danach bitte sicher anmelden.
+          </div>
+
+          <div class="wallet-url">
+            <div class="hint">Direkter Notfall-Link</div>
+            <div class="url">{{ emergency_url }}</div>
+          </div>
+
+          <div class="wallet-qr" aria-label="QR-Code zum Notfall-Link">
+            {{ emergency_qr_svg|safe }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
