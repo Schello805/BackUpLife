@@ -436,18 +436,9 @@ a {
   color: var(--aeterna-success);
 }
 
-.card-controls-row {
+.card-status {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.85rem;
-  flex-wrap: nowrap;
-}
-
-@media (max-width: 420px) {
-  .card-controls-row {
-    flex-wrap: wrap;
-  }
+  justify-content: flex-end;
 }
 
 .print-only {
