@@ -123,21 +123,25 @@ def get_category_ui(category_key: str) -> dict[str, Any]:
     ui = json.loads(json.dumps(DEFAULT_CATEGORY_UI))  # simple deep copy
     if category_key == "online_accounts":
         ui["form_intro"] = (
-            "Hinterlegen Sie die Zugänge so, wie Sie sie einem vertrauten Menschen am Küchentisch erklären würden: "
-            "klar, knapp und ohne Interpretationsspielraum."
+            "Onlinekonten sind oft der Schlüssel zu allem anderen. Besonders der E-Mail-Zugang hilft, weitere Zugänge zurückzusetzen "
+            "und Konten zu übernehmen. Hinterlegen Sie es so klar, dass es auch unter Stress sofort nutzbar ist."
         )
-        ui["fields"]["provider"].update({"label": "Anbieter", "placeholder": "z. B. Google, Meta, PayPal"})
-        ui["fields"]["website"].update({"label": "Login-Link", "placeholder": "https://..."})
-        ui["fields"]["account_username"].update({"label": "Benutzername / E-Mail", "placeholder": "z. B. name@example.com"})
+        # Minimal "password-manager like" fields for this category.
+        ui["fields"]["provider"]["show"] = False
+        ui["fields"]["website"].update({"label": "Link (Login)", "placeholder": "https://..."})
+        ui["fields"]["account_username"].update({"label": "Benutzername", "placeholder": "z. B. michael.schellenberger"})
+        ui["fields"]["contact_info"].update({"show": True, "label": "E-Mail-Adresse", "placeholder": "z. B. name@example.com"})
         ui["fields"]["account_password"].update({"label": "Passwort", "placeholder": ""})
-        ui["fields"]["reference_number"].update({"label": "Kundennummer (optional)", "placeholder": ""})
-        ui["fields"]["location_info"].update({"label": "2FA-Info / Wiederherstellung", "placeholder": "z. B. Codes in Passwortmanager / Telefonnummer ..."})
-        ui["fields"]["contact_info"].update({"label": "Support / Hotline (optional)", "placeholder": ""})
+        ui["fields"]["reference_number"]["show"] = False
+        ui["fields"]["location_info"]["show"] = False
+        ui["fields"]["details"]["show"] = False
+        ui["fields"]["notes"].update({"label": "Hinweisfeld", "placeholder": "z. B. 2FA aktiv, Recovery-Nummer, wo Backup-Codes liegen ..."})
         ui["fields"]["is_2fa_enabled"]["show"] = True
         ui["table_columns"] = [
             {"key": "title", "label": "Konto"},
-            {"key": "provider", "label": "Anbieter"},
             {"key": "account_username", "label": "Benutzername"},
+            {"key": "contact_info", "label": "E-Mail"},
+            {"key": "website", "label": "Link"},
         ]
     elif category_key == "devices_media":
         ui["form_intro"] = (

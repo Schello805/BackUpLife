@@ -13,6 +13,33 @@
     {% set values = form_values if form_values else record %}
     <form method="post" class="row g-3" novalidate>
       {{ csrf_input() }}
+      {% if category_key == 'online_accounts' and not record %}
+        <div class="col-12">
+          <div class="subtle-card p-3">
+            <div class="row g-3 align-items-end">
+              <div class="col-lg-5">
+                <label class="form-label">Schnellauswahl (empfohlen)</label>
+                <select class="form-select" id="onlinePreset">
+                  <option value="">Bitte wählen…</option>
+                  <option value="email">E-Mail</option>
+                  <option value="smartphone">Smartphone (PIN/Passwort)</option>
+                  <option value="onlinebanking">Onlinebanking</option>
+                  <option value="amazon">Amazon</option>
+                  <option value="ebay">eBay</option>
+                  <option value="other">Anderes…</option>
+                </select>
+                <div class="form-text">Damit sind die wichtigsten Zugänge schnell angelegt. Sie können alles danach frei anpassen.</div>
+              </div>
+              <div class="col-lg-7">
+                <div class="small text-secondary">
+                  Tipp: Wenn Sie nur einen Zugang wirklich priorisieren wollen, dann ist es meist der E-Mail-Zugang.
+                  Darüber lassen sich viele andere Konten zurücksetzen.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
       <div class="col-md-6">
         <label class="form-label">Titel</label>
         <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>
@@ -96,4 +123,35 @@
       </div>
     </form>
   </div>
+
+  {% if category_key == 'online_accounts' and not record %}
+    <script>
+      (function () {
+        const preset = document.getElementById('onlinePreset');
+        if (!preset) return;
+        const titleEl = document.querySelector('input[name="title"]');
+        const websiteEl = document.querySelector('input[name="website"]');
+        const emailEl = document.querySelector('input[name="contact_info"]');
+
+        const map = {
+          email: { title: 'E-Mail', url: 'https://mail.google.com/' },
+          smartphone: { title: 'Smartphone (PIN/Passwort)', url: '' },
+          onlinebanking: { title: 'Onlinebanking', url: '' },
+          amazon: { title: 'Amazon', url: 'https://www.amazon.de/ap/signin' },
+          ebay: { title: 'eBay', url: 'https://signin.ebay.de/' },
+          other: { title: '' , url: '' },
+        };
+
+        preset.addEventListener('change', () => {
+          const key = preset.value || '';
+          const entry = map[key];
+          if (!entry) return;
+          if (titleEl && entry.title) titleEl.value = entry.title;
+          if (websiteEl && entry.url) websiteEl.value = entry.url;
+          if (emailEl && key === 'email') emailEl.focus();
+          if (titleEl && key === 'other') titleEl.focus();
+        });
+      })();
+    </script>
+  {% endif %}
 {% endblock %}
