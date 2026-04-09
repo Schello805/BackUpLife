@@ -675,6 +675,33 @@ def validate_smtp_form(form: Any) -> list[str]:
     return errors
 
 
+def validate_email_change_form(form: Any, user: sqlite3.Row) -> list[str]:
+    errors: list[str] = []
+    new_email = normalize_email(form.get("new_email", ""))
+    password = form.get("password", "")
+    if not is_valid_email(new_email):
+        errors.append("Bitte geben Sie eine gültige E-Mail-Adresse ein.")
+    if not verify_password(password, user["password_hash"]):
+        errors.append("Das Passwort ist nicht korrekt.")
+    existing = g.db.execute("SELECT 1 FROM users WHERE email = ? AND id != ?", (new_email, user["id"])).fetchone()
+    if existing:
+        errors.append("Diese E-Mail-Adresse wird bereits verwendet.")
+    return errors
+
+
+def validate_password_change_form(form: Any, user: sqlite3.Row) -> list[str]:
+    errors: list[str] = []
+    current_password = form.get("current_password", "")
+    new_password = form.get("new_password", "")
+    new_password_confirm = form.get("new_password_confirm", "")
+    if not verify_password(current_password, user["password_hash"]):
+        errors.append("Das aktuelle Passwort ist nicht korrekt.")
+    errors.extend(validate_password_fields(new_password, new_password_confirm))
+    if current_password and new_password and current_password == new_password:
+        errors.append("Bitte wählen Sie ein neues Passwort, das sich vom aktuellen unterscheidet.")
+    return errors
+
+
 def get_current_user() -> sqlite3.Row | None:
     user_id = session.get("user_id")
     if not user_id:
@@ -1340,6 +1367,44 @@ def register_routes(app: Flask) -> None:
             )
         recent_logs = get_relevant_logs(g.user, get_profile_for_owner(g.user["id"]) if g.user["is_creator"] else None)[:12]
         return render_template("dashboard.html", summaries=summary, recent_logs=recent_logs)
+
+    @app.route("/konto", methods=["GET", "POST"])
+    @login_required
+    def account_settings():
+        if request.method == "POST":
+            form_id = (request.form.get("form_id") or "").strip()
+            if form_id == "email":
+                errors = validate_email_change_form(request.form, g.user)
+                if errors:
+                    for error in errors:
+                        push_toast(error, "danger", "E-Mail nicht geändert")
+                else:
+                    new_email = normalize_email(request.form.get("new_email", ""))
+                    g.db.execute("UPDATE users SET email = ?, updated_at = ? WHERE id = ?", (new_email, utcnow(), g.user["id"]))
+                    g.db.commit()
+                    log_event("account_email_change", "account", "E-Mail-Adresse geändert", user_id=g.user["id"])
+                    push_toast("Ihre E-Mail-Adresse wurde aktualisiert.", "success", "E-Mail geändert")
+                return redirect(url_for("account_settings"))
+            if form_id == "password":
+                errors = validate_password_change_form(request.form, g.user)
+                if errors:
+                    for error in errors:
+                        push_toast(error, "danger", "Passwort nicht geändert")
+                else:
+                    new_password = request.form.get("new_password", "")
+                    g.db.execute(
+                        "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+                        (hash_password(new_password), utcnow(), g.user["id"]),
+                    )
+                    g.db.commit()
+                    log_event("account_password_change", "account", "Passwort geändert", user_id=g.user["id"])
+                    push_toast("Ihr Passwort wurde aktualisiert.", "success", "Passwort geändert")
+                return redirect(url_for("account_settings"))
+            push_toast("Unbekannte Aktion.", "warning", "Konto")
+            return redirect(url_for("account_settings"))
+
+        log_event("account_view", "account", "Konto-Einstellungen geöffnet", user_id=g.user["id"])
+        return render_template("account.html")
 
     @app.route("/hilfe")
     def help_page():
