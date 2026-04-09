@@ -45,16 +45,21 @@
                     </ul>
                   </div>
                 {% endif %}
-	                <div class="text-lg-end small">
-	                  <div class="fw-semibold">{{ g.user['display_name'] }}</div>
-	                  <div class="text-secondary">{{ current_user_role()|upper }}</div>
-	                </div>
-	                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('account_settings') }}">Konto</a>
-	                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Abmelden</a>
-	              </div>
-	            </div>
-	          </div>
-	        </nav>
+                <div class="dropdown">
+                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                    <span class="fw-semibold">{{ g.user['display_name'] }}</span>
+                    <span class="text-secondary ms-1">{{ current_user_role()|upper }}</span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{{ url_for('account_settings') }}">Profil</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('logout') }}">Abmelden</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
 	      {% endif %}
 
       <div class="toast-container position-fixed top-0 end-0 p-3 no-print">

@@ -15,13 +15,7 @@
         </div>
       </div>
     </div>
-    <div class="pill-nav">
-      {% for category in categories %}
-        {% if has_category_access(g.user, profile['id'], category.key) %}
-          <a href="{{ url_for('category_overview', slug=profile['slug'], category_key=category.key) }}">{{ category.label }}</a>
-        {% endif %}
-      {% endfor %}
-    </div>
+    {# pill-nav removed: the cards below are the primary navigation #}
   </div>
 
   <div class="row g-4">

@@ -17,81 +17,91 @@
     </div>
   </div>
   <div class="page-shell p-4 p-lg-5">
-    <div class="section-label mb-2">System</div>
-    <h2 class="h4 mb-3">Zeit & Links</h2>
-    <form method="post" class="row g-3 mb-5" novalidate>
-      <input type="hidden" name="form_id" value="system">
-      <div class="col-md-6">
-        <label class="form-label">Zeitzone</label>
-        <input class="form-control" name="timezone" value="{{ app_settings['timezone'] if app_settings else 'Europe/Berlin' }}" list="timezoneList" placeholder="z. B. Europe/Berlin">
-        <datalist id="timezoneList">
-          <option value="Europe/Berlin"></option>
-          <option value="Europe/Vienna"></option>
-          <option value="Europe/Zurich"></option>
-          <option value="UTC"></option>
-        </datalist>
-        <div class="form-text">Wir speichern Zeitstempel in UTC, zeigen sie aber in dieser Zeitzone im Format <strong>TT.MM.JJJJ 24h</strong> an.</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Öffentliche Basis-URL</label>
-        <input class="form-control" name="public_base_url" value="{{ app_settings['public_base_url'] if app_settings else '' }}" placeholder="z. B. https://backup.example.de">
-        <div class="form-text">Optional. Wenn gesetzt, werden alle Links (Notfall-URL, E-Mails) exakt mit dieser Basis erzeugt. Praktisch hinter Reverse Proxies/SSL-Termination.</div>
-      </div>
-      <div class="col-12 d-flex flex-wrap gap-2">
-        <button class="btn btn-primary" type="submit">System speichern</button>
-      </div>
-    </form>
+    <div class="row g-4">
+      <div class="col-xl-7">
+        <div class="subtle-card p-4 mb-4">
+          <div class="section-label mb-2">System</div>
+          <h2 class="h4 mb-3">Zeit & Links</h2>
+          <form method="post" class="row g-3" novalidate>
+            <input type="hidden" name="form_id" value="system">
+            <div class="col-md-6">
+              <label class="form-label">Zeitzone</label>
+              <input class="form-control" name="timezone" value="{{ app_settings['timezone'] if app_settings else 'Europe/Berlin' }}" list="timezoneList" placeholder="z. B. Europe/Berlin">
+              <datalist id="timezoneList">
+                <option value="Europe/Berlin"></option>
+                <option value="Europe/Vienna"></option>
+                <option value="Europe/Zurich"></option>
+                <option value="UTC"></option>
+              </datalist>
+              <div class="form-text">Anzeigeformat: <strong>TT.MM.JJJJ 24h</strong> (intern speichern wir UTC).</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Öffentliche Basis-URL</label>
+              <input class="form-control" name="public_base_url" value="{{ app_settings['public_base_url'] if app_settings else '' }}" placeholder="z. B. https://backup.example.de">
+              <div class="form-text">Optional. Erzwingt korrekte Links (Notfall-URL, E-Mails) hinter Reverse Proxies.</div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
+            </div>
+          </form>
+        </div>
 
-    <div class="section-label mb-2">Backup</div>
-    <h2 class="h4 mb-3">Alles als ZIP sichern</h2>
-    <div class="subtle-card p-4 mb-5">
-      <div class="small text-secondary mb-3">Dieses Backup enthält Datenbank und alle hochgeladenen Dokumente. Passwörter werden nicht im Klartext exportiert, sondern so wie in BackUpLife gespeichert (verschlüsselt). Für ein Restore benötigen Sie den gleichen App-Key.</div>
-      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_backup_zip') }}">Backup-ZIP herunterladen</a>
+        <div class="subtle-card p-4">
+          <div class="section-label mb-2">SMTP</div>
+          <h2 class="h4 mb-3">E-Mails</h2>
+          <form method="post" class="row g-3" novalidate>
+            <input type="hidden" name="form_id" value="smtp">
+            <div class="col-md-6">
+              <label class="form-label">Host</label>
+              <input class="form-control" name="host" value="{{ smtp_settings['host'] }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Port</label>
+              <input class="form-control" name="port" type="number" min="1" max="65535" value="{{ smtp_settings['port'] }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Absender</label>
+              <input class="form-control" name="sender_email" type="email" value="{{ smtp_settings['sender_email'] }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Benutzername</label>
+              <input class="form-control" name="username" value="{{ smtp_settings['username'] }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Passwort</label>
+              <input type="password" class="form-control" name="smtp_password" placeholder="Nur ausfüllen, wenn es geändert werden soll">
+            </div>
+            <div class="col-md-3">
+              <div class="form-check mt-4 pt-2">
+                <input class="form-check-input" type="checkbox" name="use_tls" id="use_tls" {% if smtp_settings['use_tls'] %}checked{% endif %}>
+                <label class="form-check-label" for="use_tls">STARTTLS</label>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check mt-4 pt-2">
+                <input class="form-check-input" type="checkbox" name="use_ssl" id="use_ssl" {% if smtp_settings['use_ssl'] %}checked{% endif %}>
+                <label class="form-check-label" for="use_ssl">SSL</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Test-E-Mail an</label>
+              <input class="form-control" name="test_recipient" type="email" placeholder="optional">
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="col-xl-5">
+        <div class="subtle-card p-4 h-100">
+          <div class="section-label mb-2">Backup</div>
+          <h2 class="h4 mb-3">ZIP herunterladen</h2>
+          <p class="text-secondary small mb-3">Enthält Datenbank und alle Uploads. Zugangsdaten bleiben verschlüsselt gespeichert. Für ein Restore wird derselbe App-Key benötigt.</p>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('download_backup_zip') }}">Backup-ZIP herunterladen</a>
+        </div>
+      </div>
     </div>
-
-    <div class="section-label mb-2">SMTP</div>
-    <h2 class="h4 mb-3">E-Mails verlässlich versenden</h2>
-    <form method="post" class="row g-3" novalidate>
-      <input type="hidden" name="form_id" value="smtp">
-      <div class="col-md-6">
-        <label class="form-label">Host</label>
-        <input class="form-control" name="host" value="{{ smtp_settings['host'] }}">
-      </div>
-      <div class="col-md-2">
-        <label class="form-label">Port</label>
-        <input class="form-control" name="port" type="number" min="1" max="65535" value="{{ smtp_settings['port'] }}">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Absender</label>
-        <input class="form-control" name="sender_email" type="email" value="{{ smtp_settings['sender_email'] }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Benutzername</label>
-        <input class="form-control" name="username" value="{{ smtp_settings['username'] }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Passwort</label>
-        <input type="password" class="form-control" name="smtp_password" placeholder="Nur ausfüllen, wenn es geändert werden soll">
-      </div>
-      <div class="col-md-3">
-        <div class="form-check mt-4 pt-2">
-          <input class="form-check-input" type="checkbox" name="use_tls" id="use_tls" {% if smtp_settings['use_tls'] %}checked{% endif %}>
-          <label class="form-check-label" for="use_tls">STARTTLS</label>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="form-check mt-4 pt-2">
-          <input class="form-check-input" type="checkbox" name="use_ssl" id="use_ssl" {% if smtp_settings['use_ssl'] %}checked{% endif %}>
-          <label class="form-check-label" for="use_ssl">SSL</label>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Test-E-Mail an</label>
-        <input class="form-control" name="test_recipient" type="email" placeholder="optional">
-      </div>
-      <div class="col-12 d-flex flex-wrap gap-2">
-        <button class="btn btn-primary" type="submit">Speichern</button>
-      </div>
-    </form>
   </div>
 {% endblock %}
