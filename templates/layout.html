@@ -85,12 +85,13 @@
             <div class="small">
               <div class="fw-semibold">BackUpLife</div>
               <div class="text-secondary">Alles Wichtige an einem Ort. Für alle Fälle.</div>
-              {% if g.user and active_profile %}
-                <div class="mt-1">
-                  <span class="fw-semibold">Ihre Nachlass-URL:</span>
-                  <a href="{{ request.url_root.rstrip('/') }}{{ url_for('profile_emergency', slug=active_profile['slug']) }}" class="link-secondary">{{ request.url_root.rstrip('/') }}{{ url_for('profile_emergency', slug=active_profile['slug']) }}</a>
-                </div>
-              {% endif %}
+	              {% if g.user and active_profile %}
+	                <div class="mt-1">
+	                  <span class="fw-semibold">Ihre Nachlass-URL:</span>
+	                  {% set base = g.public_base_url if g.public_base_url else request.url_root.rstrip('/') %}
+	                  <a href="{{ base }}{{ url_for('profile_emergency', slug=active_profile['slug']) }}" class="link-secondary">{{ base }}{{ url_for('profile_emergency', slug=active_profile['slug']) }}</a>
+	                </div>
+	              {% endif %}
             </div>
           </div>
           <div class="d-flex flex-wrap gap-3 small">

@@ -30,6 +30,7 @@ from flask import (
     session,
     url_for,
 )
+from flask import send_file
 from email.message import EmailMessage
 import smtplib
 import qrcode
@@ -147,6 +148,23 @@ def get_app_timezone_name() -> str:
     return value
 
 
+def get_public_base_url() -> str | None:
+    row = g.db.execute("SELECT public_base_url FROM app_settings WHERE id = 1").fetchone()
+    if not row:
+        return None
+    value = (row["public_base_url"] or "").strip()
+    if not value:
+        return None
+    return value.rstrip("/")
+
+
+def build_external_url(endpoint: str, **values: Any) -> str:
+    base = getattr(g, "public_base_url", None)
+    if base:
+        return f"{base}{url_for(endpoint, **values)}"
+    return url_for(endpoint, _external=True, **values)
+
+
 def get_app_timezone() -> ZoneInfo:
     name = getattr(g, "app_timezone_name", None) or "Europe/Berlin"
     try:
@@ -255,6 +273,10 @@ def create_app() -> Flask:
         except sqlite3.Error:
             g.app_timezone_name = "Europe/Berlin"
         g.app_timezone = get_app_timezone()
+        try:
+            g.public_base_url = get_public_base_url()
+        except sqlite3.Error:
+            g.public_base_url = None
         allowed_endpoints = {
             "login",
             "register",
@@ -267,6 +289,7 @@ def create_app() -> Flask:
             "privacy",
             "cookies_page",
             "help_page",
+            "download_backup_zip",
         }
         if (
             not g.system_initialized
@@ -401,6 +424,7 @@ def init_db(app: Flask) -> None:
     CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         timezone TEXT NOT NULL DEFAULT 'Europe/Berlin',
+        public_base_url TEXT NOT NULL DEFAULT '',
         updated_by INTEGER,
         updated_at TEXT NOT NULL DEFAULT ''
     );
@@ -444,12 +468,16 @@ def init_db(app: Flask) -> None:
     db = get_db(app)
     db.executescript(schema)
     db.execute("INSERT OR IGNORE INTO smtp_settings (id, updated_at) VALUES (1, '')")
-    db.execute("INSERT OR IGNORE INTO app_settings (id, timezone, updated_at) VALUES (1, 'Europe/Berlin', '')")
+    db.execute("INSERT OR IGNORE INTO app_settings (id, timezone, public_base_url, updated_at) VALUES (1, 'Europe/Berlin', '', '')")
 
     # Lightweight migration: add new columns without a full migration framework.
     wishes_cols = {row["name"] for row in db.execute("PRAGMA table_info(wishes)").fetchall()}
     if "bucket_list" not in wishes_cols:
         db.execute("ALTER TABLE wishes ADD COLUMN bucket_list TEXT NOT NULL DEFAULT ''")
+
+    app_cols = {row["name"] for row in db.execute("PRAGMA table_info(app_settings)").fetchall()}
+    if "public_base_url" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN public_base_url TEXT NOT NULL DEFAULT ''")
 
     db.commit()
     db.close()
@@ -817,7 +845,7 @@ def resolve_profile_by_slug(slug: str) -> tuple[sqlite3.Row | None, str | None]:
 
 
 def build_emergency_url(slug: str) -> str:
-    return f"{request.url_root.rstrip('/')}{url_for('profile_emergency', slug=slug)}"
+    return build_external_url("profile_emergency", slug=slug)
 
 
 def build_qr_svg(value: str) -> str:
@@ -1063,7 +1091,7 @@ def render_email_html(
     button_url: str | None = None,
     footer_note: str | None = None,
 ) -> str:
-    logo_url = f"{request.url_root.rstrip('/')}{url_for('logo_asset')}" if request else ""
+    logo_url = build_external_url("logo_asset") if request else ""
     lines_html = "".join(
         f"<p style='margin:0 0 14px;color:#39566f;line-height:1.7;font-size:15px;'>{line}</p>"
         for line in body_lines
@@ -1102,7 +1130,7 @@ def render_email_html(
             <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(16,54,84,0.12);font-size:13px;color:#6e8395;line-height:1.7;">
               <p style="margin:0 0 8px;"><strong style="color:#103654;">BackUpLife</strong></p>
               <p style="margin:0 0 8px;">{footer_text}</p>
-              <p style="margin:0;">Falls der Button nicht funktioniert, nutzen Sie bitte diesen Link:<br><span style="word-break:break-all;color:#206ca6;">{button_url or request.url_root.rstrip('/')}</span></p>
+              <p style="margin:0;">Falls der Button nicht funktioniert, nutzen Sie bitte diesen Link:<br><span style="word-break:break-all;color:#206ca6;">{button_url or (getattr(g, 'public_base_url', None) or request.url_root.rstrip('/'))}</span></p>
             </div>
           </div>
         </div>
@@ -1257,7 +1285,7 @@ def register_routes(app: Flask) -> None:
                     (user["id"], token, expires_at, utcnow()),
                 )
                 g.db.commit()
-                reset_url = url_for("reset_password", token=token, _external=True)
+                reset_url = build_external_url("reset_password", token=token)
                 send_test_or_reset_mail(
                     smtp_settings,
                     user["email"],
@@ -1985,7 +2013,7 @@ def register_routes(app: Flask) -> None:
                         "Melden Sie sich mit Ihrem Benutzerkonto an, um den freigegebenen Bereich zu öffnen.",
                     ],
                     "Zur Anmeldung",
-                    url_for("login", _external=True),
+                    build_external_url("login"),
                     "Sie erhalten diese Nachricht, weil Ihnen ein BackUpLife-Bereich freigegeben wurde.",
                 ),
             )
@@ -2082,9 +2110,14 @@ def register_routes(app: Flask) -> None:
                 except ZoneInfoNotFoundError:
                     push_toast("Die Zeitzone ist ungültig. Beispiel: Europe/Berlin", "danger", "System")
                     return redirect(url_for("admin"))
+                public_base_url = (request.form.get("public_base_url") or "").strip()
+                if public_base_url and not (public_base_url.startswith("http://") or public_base_url.startswith("https://")):
+                    push_toast("Die Basis-URL muss mit http:// oder https:// beginnen.", "danger", "System")
+                    return redirect(url_for("admin"))
+                public_base_url = public_base_url.rstrip("/")
                 g.db.execute(
-                    "UPDATE app_settings SET timezone = ?, updated_by = ?, updated_at = ? WHERE id = 1",
-                    (tz_name, g.user["id"], utcnow()),
+                    "UPDATE app_settings SET timezone = ?, public_base_url = ?, updated_by = ?, updated_at = ? WHERE id = 1",
+                    (tz_name, public_base_url, g.user["id"], utcnow()),
                 )
                 g.db.commit()
                 log_event("system_update", "admin", f"Zeitzone gesetzt: {tz_name}")
@@ -2136,7 +2169,7 @@ def register_routes(app: Flask) -> None:
                             "Bitte prüfen Sie auch Spam-Ordner und Absenderdarstellung Ihres Mail-Providers.",
                         ],
                         "BackUpLife öffnen",
-                        url_for("admin", _external=True),
+                        build_external_url("admin"),
                         "Diese Testmail wurde manuell im Adminbereich von BackUpLife ausgelöst.",
                     ),
                 )
@@ -2151,6 +2184,41 @@ def register_routes(app: Flask) -> None:
             "documents": g.db.execute("SELECT COUNT(*) AS count FROM documents").fetchone()["count"],
         }
         return render_template("admin.html", smtp_settings=smtp_settings, app_settings=app_settings, stats=stats)
+
+    @app.route("/admin/backup.zip")
+    @login_required
+    @admin_required
+    def download_backup_zip():
+        # Create a self-contained backup (DB + uploads). Secrets stay encrypted in the DB.
+        db_path = app.config["DB_PATH"]
+        upload_dir = app.config["UPLOAD_DIR"]
+        buffer = io.BytesIO()
+        now = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        import zipfile
+
+        with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            if db_path.exists():
+                zf.write(db_path, arcname="instance/aeterna.db")
+            if upload_dir.exists():
+                for path in upload_dir.rglob("*"):
+                    if path.is_file():
+                        rel = path.relative_to(app.config["UPLOAD_DIR"].parent)
+                        zf.write(path, arcname=str(rel))
+            meta = {
+                "app": "BackUpLife",
+                "created_at_utc": utcnow(),
+                "public_base_url": getattr(g, "public_base_url", None),
+            }
+            zf.writestr("backup.json", json.dumps(meta, ensure_ascii=False, indent=2))
+
+        buffer.seek(0)
+        log_event("backup_download", "admin", "Backup ZIP heruntergeladen")
+        return send_file(
+            buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"backuplife-backup-{now}.zip",
+        )
 
     @app.context_processor
     def inject_context() -> dict[str, Any]:
