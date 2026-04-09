@@ -3,8 +3,10 @@ set -euo pipefail
 
 # Updates an existing BackUpLife installation created by install_debian13.sh.
 # Run this from a freshly pulled repo checkout:
-#   git pull --ff-only
 #   sudo bash update_debian13.sh
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_DIR"
 
 APP_DIR="/opt/backuplife"
 SERVICE_FILE="/etc/systemd/system/backuplife.service"
@@ -14,6 +16,21 @@ APP_USER="backuplife"
 ENV_FILE="$APP_DIR/.env"
 BUILD_SHA="$(git rev-parse --short HEAD 2>/dev/null || true)"
 BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+if [ -d "$REPO_DIR/.git" ]; then
+  echo "Aktualisiere Repo (git pull --ff-only) ..."
+  # Never prompt for credentials in unattended installs/updates.
+  export GIT_TERMINAL_PROMPT=0
+  if [ -n "${SUDO_USER:-}" ] && command -v sudo >/dev/null 2>&1; then
+    if ! sudo -u "$SUDO_USER" git -C "$REPO_DIR" pull --ff-only; then
+      echo "Warnung: git pull ist fehlgeschlagen. Fahre mit dem aktuellen Stand fort."
+    fi
+  else
+    if ! git -C "$REPO_DIR" pull --ff-only; then
+      echo "Warnung: git pull ist fehlgeschlagen. Fahre mit dem aktuellen Stand fort."
+    fi
+  fi
+fi
 
 apt-get update
 apt-get install -y python3 python3-venv python3-pip nginx sqlite3 rsync openssl iproute2
@@ -32,7 +49,7 @@ rsync -a --delete \
   --exclude "instance/" \
   --exclude "__pycache__/" \
   --exclude ".pytest_cache/" \
-  ./ "$APP_DIR"/
+  "$REPO_DIR"/ "$APP_DIR"/
 
 cd "$APP_DIR"
 python3 -m venv .venv
