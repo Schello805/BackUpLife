@@ -256,19 +256,21 @@ def get_category_ui(category_key: str) -> dict[str, Any]:
     elif category_key == "home_network":
         ui["form_intro"] = (
             "Smarthome und Heimnetz sind oft schwer zu übernehmen, wenn niemand die Struktur kennt. "
-            "WLAN, Router-Zugänge, Geräte-Listen und wichtige Apps helfen enorm."
+            "Router-/Admin-Zugänge, Geräte-Listen und wichtige Apps helfen enorm."
         )
         ui["fields"]["provider"].update({"label": "System/Hersteller (optional)", "placeholder": "z. B. Fritz!Box, Google Home, Home Assistant"})
-        ui["fields"]["website"]["show"] = False
-        ui["fields"]["account_username"].update({"label": "Admin-Login (optional)", "placeholder": "Benutzername"})
-        ui["fields"]["account_password"].update({"label": "WLAN-/Admin-Passwort (optional)", "placeholder": ""})
-        ui["fields"]["reference_number"].update({"label": "WLAN-Name (SSID) (optional)", "placeholder": ""})
-        ui["fields"]["location_info"].update({"label": "Router/Schlüssel-Ort", "placeholder": "z. B. Flur-Schrank, Keller, Technikraum" })
+        ui["fields"]["website"].update({"label": "Link / URL (optional)", "placeholder": "z. B. https://fritz.box oder https://..."})
+        ui["fields"]["website"]["show"] = True
+        ui["fields"]["account_username"].update({"label": "Benutzername (optional)", "placeholder": "Benutzername / E-Mail"})
+        ui["fields"]["account_password"].update({"label": "Passwort (optional)", "placeholder": ""})
+        ui["fields"]["reference_number"]["show"] = False
+        ui["fields"]["location_info"].update({"label": "Router/Schlüssel-Ort (optional)", "placeholder": "z. B. Flur-Schrank, Keller, Technikraum" })
         ui["fields"]["contact_info"]["show"] = False
         ui["fields"]["is_2fa_enabled"]["show"] = False
         ui["table_columns"] = [
             {"key": "title", "label": "Bereich"},
             {"key": "provider", "label": "System"},
+            {"key": "website", "label": "Link"},
             {"key": "location_info", "label": "Ort"},
         ]
     return ui
