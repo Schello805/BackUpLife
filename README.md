@@ -1,10 +1,10 @@
 # BackUpLife
 
-BackUpLife ist eine kostenlose, deutschsprachige **WebApp (Nachlass App)** für **digitalen Nachlass**: Zugangsdaten, Unterlagen, Geräte, Verträge und persönliche Worte so hinterlassen, dass Angehörige im Notfall schneller Orientierung finden. Die App ist für den Selbstbetrieb gedacht (z. B. lokal, im Heimnetz oder auf einem Debian‑Server hinter Reverse Proxy).
+BackUpLife ist eine kostenlose, deutschsprachige **WebApp (Nachlass App)** für **digitalen Nachlass**: Zugangsdaten, Unterlagen, Geräte, Verträge und persönliche Worte so hinterlassen, dass Angehörige im Notfall schneller Orientierung finden. Die App ist für den Selbstbetrieb gedacht, zum Beispiel auf einem **Raspberry Pi**, NAS oder in einer **VM** (lokal, im Heimnetz oder auf einem Debian‑Server hinter Reverse Proxy).
 
 Slogan: **Alles Wichtige an einem Ort. Für alle Fälle.**
 
-Wichtig: BackUpLife ersetzt kein Testament und ist keine rechtlich verbindliche Verfügung. Es ist eine strukturierte Möglichkeit, Gedanken, Wünsche und praktische Informationen zu hinterlassen.
+Wichtig: BackUpLife ersetzt kein Testament und ist keine rechtlich verbindliche Verfügung. Es ist eine strukturierte Möglichkeit, Gedanken, Wünsche und praktische Informationen zu hinterlassen. Siehe auch die Seite **/nutzungsbedingungen**.
 
 ## Features
 
@@ -27,7 +27,7 @@ Wichtig: BackUpLife ersetzt kein Testament und ist keine rechtlich verbindliche 
   - Rate‑Limit und **gestaffelter Login‑Lockout** (5/10/15 Fehlversuche)
   - **TOTP‑2FA** (optional) und **Admin‑2FA Pflicht** (Default)
 - Admin‑Backup‑Download als **verschlüsseltes** Archiv (`.zip.enc`)
-- Debug/Verifikation: `/version` zeigt Version/Build‑SHA/Build‑Datum
+- Debug/Verifikation: `/version` zeigt Version/Build‑SHA/Build‑Datum (standardmäßig nur lokal erreichbar)
 
 ## Kategorien (Digitaler Nachlass)
 
@@ -36,8 +36,8 @@ Wichtig: BackUpLife ersetzt kein Testament und ist keine rechtlich verbindliche 
 - Websites & Domains
 - Verträge
 - Versicherungen
-- Dokumente
-- Unterlagen & Notgroschen
+- Nachlassdokumente
+- Allgemeines
 - Heimnetz & Smarthome
 
 ## Tech‑Stack
@@ -117,4 +117,3 @@ Dieses Projekt steht unter der **PolyForm Noncommercial License** (nicht‑komme
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 
 <img width="1374" height="781" alt="Bildschirmfoto 2026-04-09 um 18 57 59" src="https://github.com/user-attachments/assets/f4be33ee-3cbb-47e4-af82-27f8a63ec783" />
-

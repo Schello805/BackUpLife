@@ -19,7 +19,17 @@ def test_setup_page_reachable(client):
 
 
 def test_legal_help_pages_reachable_after_init(logged_in_admin):
-    for path in ["/hilfe", "/impressum", "/datenschutz", "/cookies", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/sw.js"]:
+    for path in [
+        "/hilfe",
+        "/impressum",
+        "/datenschutz",
+        "/cookies",
+        "/nutzungsbedingungen",
+        "/robots.txt",
+        "/sitemap.xml",
+        "/manifest.webmanifest",
+        "/sw.js",
+    ]:
         resp = logged_in_admin.get(path)
         assert resp.status_code == 200
 
@@ -72,6 +82,7 @@ def test_registration_requires_smtp_when_verification_enabled(app, app_module, c
             "email": "max@example.com",
             "role": "creator",
             "password": "very-secure-password",
+            "accept_terms": "1",
         },
         follow_redirects=True,
         headers={"X-Forwarded-For": "203.0.113.55"},
@@ -118,6 +129,7 @@ def test_email_verification_flow(app, app_module, monkeypatch):
             "email": "erika@example.com",
             "role": "creator",
             "password": "very-secure-password",
+            "accept_terms": "1",
         },
         headers={"X-Forwarded-For": "203.0.113.56"},
         follow_redirects=False,

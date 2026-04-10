@@ -53,6 +53,7 @@ INSTANCE_DIR = BASE_DIR / "instance"
 DEFAULT_DB_PATH = INSTANCE_DIR / "aeterna.db"
 DEFAULT_UPLOAD_DIR = INSTANCE_DIR / "uploads"
 APP_VERSION = "0.1.2"
+TERMS_VERSION = "2026-04-10"
 GITHUB_REPO = "Schello805/BackUpLife"
 GITHUB_PROJECT_URL = "https://github.com/Schello805/BackUpLife"
 UPDATE_CHECK_TTL_SECONDS = 6 * 60 * 60
@@ -803,6 +804,7 @@ def create_app() -> Flask:
             "imprint",
             "privacy",
             "cookies_page",
+            "terms_page",
             "help_page",
             "robots_txt",
             "sitemap_xml",
@@ -874,6 +876,8 @@ def init_db(app: Flask) -> None:
         is_admin INTEGER NOT NULL DEFAULT 0,
         is_creator INTEGER NOT NULL DEFAULT 0,
         is_reader INTEGER NOT NULL DEFAULT 0,
+        terms_accepted_at TEXT,
+        terms_version TEXT NOT NULL DEFAULT '',
         email_verified_at TEXT,
         totp_secret_encrypted TEXT NOT NULL DEFAULT '',
         totp_enabled INTEGER NOT NULL DEFAULT 0,
@@ -1052,6 +1056,12 @@ def init_db(app: Flask) -> None:
     wishes_cols = {row["name"] for row in db.execute("PRAGMA table_info(wishes)").fetchall()}
     if "bucket_list" not in wishes_cols:
         db.execute("ALTER TABLE wishes ADD COLUMN bucket_list TEXT NOT NULL DEFAULT ''")
+
+    user_cols = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "terms_accepted_at" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN terms_accepted_at TEXT")
+    if "terms_version" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN terms_version TEXT NOT NULL DEFAULT ''")
 
     user_cols = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
     if "email_verified_at" not in user_cols:
@@ -1328,6 +1338,8 @@ def validate_setup_form(form: Any) -> list[str]:
     if not is_valid_email(email):
         errors.append("Bitte geben Sie eine gültige E-Mail-Adresse ein.")
     errors.extend(validate_password_fields(password, password_confirm))
+    if not form.get("accept_terms"):
+        errors.append("Bitte bestätigen Sie die Nutzungsbedingungen.")
     return errors
 
 
@@ -2135,6 +2147,7 @@ def register_routes(app: Flask) -> None:
             f"{base}{url_for('imprint')}",
             f"{base}{url_for('privacy')}",
             f"{base}{url_for('cookies_page')}",
+            f"{base}{url_for('terms_page')}",
             f"{base}{url_for('help_page')}",
             f"{base}{url_for('login')}",
             f"{base}{url_for('register')}",
@@ -2243,6 +2256,10 @@ self.addEventListener('fetch', (event) => {
                         request.form.get("password", ""),
                         "admin",
                         None,
+                    )
+                    g.db.execute(
+                        "UPDATE users SET terms_accepted_at = ?, terms_version = ?, updated_at = ? WHERE id = ?",
+                        (utcnow(), TERMS_VERSION, utcnow(), user_id),
                     )
                     # First user is the only admin; mark verified to avoid lockouts if verification is enabled later.
                     g.db.execute("UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?", (utcnow(), utcnow(), user_id))
@@ -2432,6 +2449,9 @@ self.addEventListener('fetch', (event) => {
                 )
                 return render_template("register.html", form_values=None), 429
             errors, data = validate_user_form(request.form)
+            if not request.form.get("accept_terms"):
+                errors = list(errors) + ["Bitte bestätigen Sie die Nutzungsbedingungen."]
+            data["accept_terms"] = "1" if request.form.get("accept_terms") else ""
             role = data["role"]
             if role == "admin":
                 role = "reader"
@@ -2457,6 +2477,10 @@ self.addEventListener('fetch', (event) => {
                     data["password"],
                     role,
                     None,
+                )
+                g.db.execute(
+                    "UPDATE users SET terms_accepted_at = ?, terms_version = ?, updated_at = ? WHERE id = ?",
+                    (utcnow(), TERMS_VERSION, utcnow(), user_id),
                 )
                 g.db.commit()
                 if require_verification:
@@ -2903,6 +2927,11 @@ self.addEventListener('fetch', (event) => {
     def cookies_page():
         log_event("cookies_view", "legal", "Cookie-Hinweis geöffnet")
         return render_template("cookies.html")
+
+    @app.route("/nutzungsbedingungen")
+    def terms_page():
+        log_event("terms_view", "legal", "Nutzungsbedingungen geöffnet")
+        return render_template("terms.html", terms_version=TERMS_VERSION)
 
     @app.route("/nachlass/<slug>")
     @login_required

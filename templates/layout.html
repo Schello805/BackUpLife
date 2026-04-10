@@ -151,6 +151,7 @@
             <a href="{{ url_for('imprint') }}" class="link-secondary">Impressum</a>
             <a href="{{ url_for('privacy') }}" class="link-secondary">Datenschutz</a>
             <a href="{{ url_for('cookies_page') }}" class="link-secondary">Cookies</a>
+            <a href="{{ url_for('terms_page') }}" class="link-secondary">Nutzungsbedingungen</a>
             <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}" target="_blank" rel="noreferrer" class="link-secondary">GitHub</a>
             {% if build_info and build_info.build_sha %}
               <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}/commit/{{ build_info.build_sha }}" target="_blank" rel="noreferrer" class="link-secondary">Build: {{ build_info.build_sha }}</a>

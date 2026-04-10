@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block title %}Nutzungsbedingungen · BackUpLife{% endblock %}
+{% block meta_description %}Nutzungsbedingungen und Haftungsausschluss für BackUpLife (kostenlose Open-Source-WebApp zur privaten Organisation von digitalem Nachlass, Unterlagen und Zugangsdaten).{% endblock %}
+
+{% block content %}
+  <div class="container pb-5">
+    <div class="page-shell p-4 p-lg-5">
+      <p class="section-label mb-2">Nutzungsbedingungen</p>
+      <h1 class="h3 mb-3">BackUpLife ist eine Orientierungshilfe, kein Testament</h1>
+      <p class="text-secondary mb-4">
+        BackUpLife hilft dabei, Informationen strukturiert zu hinterlassen, die Angehörige oder Vertrauenspersonen in belastenden Situationen
+        schnell finden und verstehen können. BackUpLife ersetzt keine rechtliche Beratung und ist kein Testament oder Vertrag.
+      </p>
+
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="subtle-card p-4 h-100">
+            <div class="fw-semibold mb-2">1. Zweck der WebApp</div>
+            <div class="text-secondary">
+              BackUpLife dient ausschließlich der privaten Organisation (z. B. Zugangsdaten, Unterlagen, Geräte, Verträge, Versicherungen,
+              persönliche Hinweise). Ob und wie Hinterbliebene Hinweise umsetzen, entscheiden sie selbst. Rechtsverbindliche Regelungen
+              (z. B. Testament, Vollmacht) müssen nach den jeweils geltenden gesetzlichen Formvorschriften erstellt werden.
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="subtle-card p-4 h-100">
+            <div class="fw-semibold mb-2">2. Selbst-Hosting empfohlen</div>
+            <div class="text-secondary">
+              BackUpLife ist Open Source. Für maximale Kontrolle und Sicherheit empfehlen wir den Betrieb im eigenen Umfeld,
+              zum Beispiel auf einem Raspberry Pi, einem NAS oder einer VM. So bleiben Daten, Schlüssel und Zugriffswege in Ihrer Hand.
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="subtle-card p-4 h-100">
+            <div class="fw-semibold mb-2">3. Sicherheit, Passwörter und Verantwortung</div>
+            <div class="text-secondary">
+              BackUpLife speichert sensible Inhalte verschlüsselt. Dennoch hängt die tatsächliche Sicherheit auch vom Betrieb ab
+              (Updates, sichere Passwörter, Zugriffsschutz, Serverhärtung, Reverse Proxy/HTTPS). Sie sind dafür verantwortlich,
+              die Instanz angemessen zu betreiben und Zugriffsberechtigungen sorgfältig zu vergeben.
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="subtle-card p-4 h-100">
+            <div class="fw-semibold mb-2">4. Haftungsausschluss</div>
+            <div class="text-secondary">
+              Die Nutzung erfolgt auf eigene Verantwortung. Wir übernehmen keine Gewähr für Vollständigkeit, Aktualität oder Eignung der Inhalte
+              und keine Garantie für dauerhafte Verfügbarkeit oder Fehlerfreiheit. Eine Haftung für Schäden ist, soweit gesetzlich zulässig,
+              ausgeschlossen. Dies gilt nicht für Schäden aus vorsätzlicher oder grob fahrlässiger Pflichtverletzung sowie bei Verletzung von Leben,
+              Körper oder Gesundheit; in diesen Fällen gelten die gesetzlichen Regelungen.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 text-secondary small">
+        Version dieser Nutzungsbedingungen: {{ terms_version }}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
