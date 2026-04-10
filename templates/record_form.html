@@ -115,6 +115,36 @@
           </div>
         </div>
       {% endif %}
+      {% if category_key == 'contracts' and not record %}
+        <div class="col-12">
+          <div class="subtle-card p-3">
+            <div class="row g-3 align-items-end">
+              <div class="col-lg-6">
+                <label class="form-label">Schnellauswahl (empfohlen)</label>
+                <select class="form-select" id="contractPreset">
+                  <option value="">Bitte wählen…</option>
+                  <option value="darlehen">Darlehensvertrag</option>
+                  <option value="ehe">Ehevertrag</option>
+                  <option value="kauf">Kaufvertrag</option>
+                  <option value="miete">Mietvertrag</option>
+                  <option value="mobilfunk">Mobilfunkvertrag</option>
+                  <option value="stromgas">Strom / Gas</option>
+                  <option value="internet">Internet / TV</option>
+                  <option value="abo">Abonnement / Mitgliedschaft</option>
+                  <option value="leasing">Leasingvertrag</option>
+                  <option value="other">Anderes…</option>
+                </select>
+                <div class="form-text">Der Titel wird automatisch vorbelegt und kann danach angepasst werden.</div>
+              </div>
+              <div class="col-lg-6">
+                <div class="small text-secondary">
+                  Tipp: Hinterlegen Sie Laufzeiten, Kündigungsfristen, Vertragsnummern und wo die Unterlagen liegen. Das spart im Ernstfall viel Zeit.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
       <div class="col-md-6">
         <label class="form-label">{% if category_key == 'documents' %}Dokument{% else %}Titel{% endif %}</label>
         <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>
@@ -290,6 +320,37 @@
           berufsunf: 'Berufsunfähigkeitsversicherung',
           kfz: 'Kfz-Versicherung',
           rechtsschutz: 'Rechtsschutzversicherung',
+          other: '',
+        };
+
+        preset.addEventListener('change', () => {
+          const key = preset.value || '';
+          if (!titleEl) return;
+          const value = map[key];
+          if (typeof value === 'string') {
+            if (value) titleEl.value = value;
+            titleEl.focus();
+          }
+        });
+      })();
+    </script>
+  {% endif %}
+  {% if category_key == 'contracts' and not record %}
+    <script>
+      (function () {
+        const preset = document.getElementById('contractPreset');
+        if (!preset) return;
+        const titleEl = document.querySelector('input[name="title"]');
+        const map = {
+          darlehen: 'Darlehensvertrag',
+          ehe: 'Ehevertrag',
+          kauf: 'Kaufvertrag',
+          miete: 'Mietvertrag',
+          mobilfunk: 'Mobilfunkvertrag',
+          stromgas: 'Strom / Gas',
+          internet: 'Internet / TV',
+          abo: 'Abonnement / Mitgliedschaft',
+          leasing: 'Leasingvertrag',
           other: '',
         };
 
