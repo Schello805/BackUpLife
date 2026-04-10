@@ -85,6 +85,36 @@
           </div>
         </div>
       {% endif %}
+      {% if category_key == 'insurances' and not record %}
+        <div class="col-12">
+          <div class="subtle-card p-3">
+            <div class="row g-3 align-items-end">
+              <div class="col-lg-6">
+                <label class="form-label">Schnellauswahl (empfohlen)</label>
+                <select class="form-select" id="insurancePreset">
+                  <option value="">Bitte wählen…</option>
+                  <option value="leben">Lebensversicherung</option>
+                  <option value="unfall">Unfallversicherung</option>
+                  <option value="haftpflicht">Privathaftpflicht</option>
+                  <option value="hausrat">Hausratversicherung</option>
+                  <option value="kranken">Krankenversicherung</option>
+                  <option value="pflege">Pflegezusatzversicherung</option>
+                  <option value="berufsunf">Berufsunfähigkeitsversicherung</option>
+                  <option value="kfz">Kfz-Versicherung</option>
+                  <option value="rechtsschutz">Rechtsschutzversicherung</option>
+                  <option value="other">Anderes…</option>
+                </select>
+                <div class="form-text">Der Titel wird automatisch vorbelegt und kann danach angepasst werden.</div>
+              </div>
+              <div class="col-lg-6">
+                <div class="small text-secondary">
+                  Tipp: Wenn möglich, tragen Sie die Policen-Nummer und den Unterlagen-Ort ein oder laden Sie die Police als Dokument hoch.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
       <div class="col-md-6">
         <label class="form-label">{% if category_key == 'documents' %}Dokument{% else %}Titel{% endif %}</label>
         <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>
@@ -230,6 +260,37 @@
           bankvollmacht: 'Bankvollmacht',
           vollmachten: 'Vollmachten (Sammlung)',
           sonstiges: '',
+        };
+
+        preset.addEventListener('change', () => {
+          const key = preset.value || '';
+          if (!titleEl) return;
+          const value = map[key];
+          if (typeof value === 'string') {
+            if (value) titleEl.value = value;
+            titleEl.focus();
+          }
+        });
+      })();
+    </script>
+  {% endif %}
+  {% if category_key == 'insurances' and not record %}
+    <script>
+      (function () {
+        const preset = document.getElementById('insurancePreset');
+        if (!preset) return;
+        const titleEl = document.querySelector('input[name="title"]');
+        const map = {
+          leben: 'Lebensversicherung',
+          unfall: 'Unfallversicherung',
+          haftpflicht: 'Privathaftpflicht',
+          hausrat: 'Hausratversicherung',
+          kranken: 'Krankenversicherung',
+          pflege: 'Pflegezusatzversicherung',
+          berufsunf: 'Berufsunfähigkeitsversicherung',
+          kfz: 'Kfz-Versicherung',
+          rechtsschutz: 'Rechtsschutzversicherung',
+          other: '',
         };
 
         preset.addEventListener('change', () => {
