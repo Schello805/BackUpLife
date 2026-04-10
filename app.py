@@ -95,7 +95,7 @@ APP_CATEGORIES = [
     ("web_domains", "Websites & Domains"),
     ("contracts", "Verträge"),
     ("insurances", "Versicherungen"),
-    ("documents", "Dokumente"),
+    ("documents", "Nachlassdokumente"),
     ("important_items", "Unterlagen & Notgroschen"),
     ("home_network", "Heimnetz & Smarthome"),
 ]
@@ -220,19 +220,18 @@ def get_category_ui(category_key: str) -> dict[str, Any]:
         ]
     elif category_key == "documents":
         ui["form_intro"] = (
-            "Nutzen Sie diesen Bereich für Dokument-Hinweise oder Listen. Die eigentlichen Dateien laden Sie unten hoch."
+            "Nutzen Sie diesen Bereich für Nachlassdokumente (Hinweise oder Listen). Die eigentlichen Dateien laden Sie unten hoch."
         )
         ui["fields"]["provider"]["show"] = False
         ui["fields"]["website"]["show"] = False
         ui["fields"]["account_username"]["show"] = False
         ui["fields"]["account_password"]["show"] = False
-        ui["fields"]["reference_number"].update({"label": "Dokumenttyp (optional)", "placeholder": "z. B. Vollmacht, Ausweis, Kontoauszug"})
+        ui["fields"]["reference_number"]["show"] = False
         ui["fields"]["location_info"].update({"label": "Original liegt hier", "placeholder": "z. B. Ordner im Regal, Tresor ..." })
         ui["fields"]["contact_info"]["show"] = False
         ui["fields"]["is_2fa_enabled"]["show"] = False
         ui["table_columns"] = [
             {"key": "title", "label": "Hinweis"},
-            {"key": "reference_number", "label": "Typ"},
             {"key": "location_info", "label": "Original"},
         ]
     elif category_key == "important_items":

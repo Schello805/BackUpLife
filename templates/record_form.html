@@ -54,8 +54,39 @@
           </div>
         </div>
       {% endif %}
+      {% if category_key == 'documents' and not record %}
+        <div class="col-12">
+          <div class="subtle-card p-3">
+            <div class="row g-3 align-items-end">
+              <div class="col-lg-6">
+                <label class="form-label">Schnellauswahl (empfohlen)</label>
+                <select class="form-select" id="docPreset">
+                  <option value="">Bitte wählen…</option>
+                  <option value="testament">Testament</option>
+                  <option value="erbvertrag">Erbvertrag</option>
+                  <option value="patientenverf">Patientenverfügung</option>
+                  <option value="vorsorgevollmacht">Vorsorgevollmacht</option>
+                  <option value="betreuungsverf">Betreuungsverfügung</option>
+                  <option value="organspende">Organspendeausweis</option>
+                  <option value="bestattungsv">Bestattungsverfügung / Bestattungsvorsorge</option>
+                  <option value="generalvollmacht">Generalvollmacht</option>
+                  <option value="bankvollmacht">Bankvollmacht</option>
+                  <option value="vollmachten">Vollmachten (Sammlung)</option>
+                  <option value="sonstiges">Anderes…</option>
+                </select>
+                <div class="form-text">Wählen Sie einen Dokumenttyp aus. Der Titel wird automatisch vorbelegt und kann danach angepasst werden.</div>
+              </div>
+              <div class="col-lg-6">
+                <div class="small text-secondary">
+                  Tipp: Hinterlegen Sie möglichst auch den Ort des Originals (Ordner, Tresor, Notfallmappe) oder laden Sie eine Kopie unten als Datei hoch.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
       <div class="col-md-6">
-        <label class="form-label">Titel</label>
+        <label class="form-label">{% if category_key == 'documents' %}Dokument{% else %}Titel{% endif %}</label>
         <input class="form-control" name="title" minlength="3" maxlength="120" value="{{ values['title'] if values else '' }}" required>
       </div>
       {% set f = ui.fields if ui else {} %}
@@ -177,6 +208,38 @@
           if (websiteEl && entry.url) websiteEl.value = entry.url;
           if (emailEl && key === 'email') emailEl.focus();
           if (titleEl && key === 'other') titleEl.focus();
+        });
+      })();
+    </script>
+  {% endif %}
+  {% if category_key == 'documents' and not record %}
+    <script>
+      (function () {
+        const preset = document.getElementById('docPreset');
+        if (!preset) return;
+        const titleEl = document.querySelector('input[name="title"]');
+        const map = {
+          testament: 'Testament',
+          erbvertrag: 'Erbvertrag',
+          patientenverf: 'Patientenverfügung',
+          vorsorgevollmacht: 'Vorsorgevollmacht',
+          betreuungsverf: 'Betreuungsverfügung',
+          organspende: 'Organspendeausweis',
+          bestattungsv: 'Bestattungsverfügung / Bestattungsvorsorge',
+          generalvollmacht: 'Generalvollmacht',
+          bankvollmacht: 'Bankvollmacht',
+          vollmachten: 'Vollmachten (Sammlung)',
+          sonstiges: '',
+        };
+
+        preset.addEventListener('change', () => {
+          const key = preset.value || '';
+          if (!titleEl) return;
+          const value = map[key];
+          if (typeof value === 'string') {
+            if (value) titleEl.value = value;
+            titleEl.focus();
+          }
         });
       })();
     </script>
