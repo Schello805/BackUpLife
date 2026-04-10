@@ -3480,6 +3480,35 @@ self.addEventListener('fetch', (event) => {
         push_toast("Der Benutzerstatus wurde aktualisiert.", "success", "Status geändert")
         return redirect(url_for("management"))
 
+    @app.route("/verwaltung/benutzer/<int:user_id>/loeschen", methods=["POST"])
+    @login_required
+    @creator_required
+    def delete_user(user_id: int):
+        if user_id == g.user["id"]:
+            push_toast("Sie können Ihr eigenes Konto hier nicht löschen.", "danger", "Benutzer nicht gelöscht")
+            return redirect(url_for("management"))
+        user = g.db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not user:
+            abort(404)
+        if user["is_admin"]:
+            push_toast("Der Admin kann nicht gelöscht werden.", "danger", "Benutzer nicht gelöscht")
+            return redirect(url_for("management"))
+        # Deleting creators deletes their entire profile; only admin may do that.
+        if user["is_creator"] and not g.user["is_admin"]:
+            abort(403)
+
+        # Collect context for audit message before deletion.
+        profile = g.db.execute("SELECT id, title FROM profiles WHERE owner_user_id = ?", (user_id,)).fetchone()
+        detail = f"Benutzer gelöscht: {user['display_name']} ({user['email']})"
+        if profile:
+            detail += f" · inkl. Nachlass: {profile['title']}"
+
+        g.db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        g.db.commit()
+        log_event("user_delete", "users", detail)
+        push_toast("Der Benutzer wurde gelöscht.", "success", "Benutzer gelöscht")
+        return redirect(url_for("management"))
+
     @app.route("/verwaltung/freigaben/neu", methods=["POST"])
     @login_required
     @creator_required

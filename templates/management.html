@@ -129,10 +129,22 @@
                   <td>{{ 'Aktiv' if user['active'] else 'Deaktiviert' }}</td>
                   <td class="text-end">
                     {% if user['id'] != g.user['id'] %}
-                      <form method="post" action="{{ url_for('toggle_user_status', user_id=user['id']) }}">
-                        {{ csrf_input() }}
-                        <button class="btn btn-outline-secondary btn-sm">{{ 'Aktivieren' if not user['active'] else 'Deaktivieren' }}</button>
-                      </form>
+                      <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
+                        <form method="post" action="{{ url_for('toggle_user_status', user_id=user['id']) }}">
+                          {{ csrf_input() }}
+                          <button class="btn btn-outline-secondary btn-sm">{{ 'Aktivieren' if not user['active'] else 'Deaktivieren' }}</button>
+                        </form>
+                        {% if not user['is_admin'] and (not user['is_creator'] or g.user['is_admin']) %}
+                          {% set delete_msg = 'Dieser Benutzer ist Ersteller. Beim Löschen wird auch sein kompletter Nachlass entfernt. Wirklich löschen?' if user['is_creator'] else 'Benutzer wirklich löschen? Alle Freigaben werden entfernt.' %}
+                          <form method="post" action="{{ url_for('delete_user', user_id=user['id']) }}">
+                            {{ csrf_input() }}
+                            <button
+                              class="btn btn-outline-danger btn-sm"
+                              onclick="return confirm('{{ delete_msg|e }}')"
+                            >Löschen</button>
+                          </form>
+                        {% endif %}
+                      </div>
                     {% endif %}
                   </td>
                 </tr>
