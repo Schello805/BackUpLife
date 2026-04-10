@@ -929,6 +929,10 @@ def init_db(app: Flask) -> None:
         farewell_message TEXT NOT NULL DEFAULT '',
         asset_notes TEXT NOT NULL DEFAULT '',
         ceremony_notes TEXT NOT NULL DEFAULT '',
+        words_mother TEXT NOT NULL DEFAULT '',
+        words_father TEXT NOT NULL DEFAULT '',
+        words_partner TEXT NOT NULL DEFAULT '',
+        words_children TEXT NOT NULL DEFAULT '',
         bucket_list TEXT NOT NULL DEFAULT '',
         important_contacts TEXT NOT NULL DEFAULT '',
         external_links TEXT NOT NULL DEFAULT '',
@@ -1056,6 +1060,15 @@ def init_db(app: Flask) -> None:
     wishes_cols = {row["name"] for row in db.execute("PRAGMA table_info(wishes)").fetchall()}
     if "bucket_list" not in wishes_cols:
         db.execute("ALTER TABLE wishes ADD COLUMN bucket_list TEXT NOT NULL DEFAULT ''")
+    wishes_cols = {row["name"] for row in db.execute("PRAGMA table_info(wishes)").fetchall()}
+    if "words_mother" not in wishes_cols:
+        db.execute("ALTER TABLE wishes ADD COLUMN words_mother TEXT NOT NULL DEFAULT ''")
+    if "words_father" not in wishes_cols:
+        db.execute("ALTER TABLE wishes ADD COLUMN words_father TEXT NOT NULL DEFAULT ''")
+    if "words_partner" not in wishes_cols:
+        db.execute("ALTER TABLE wishes ADD COLUMN words_partner TEXT NOT NULL DEFAULT ''")
+    if "words_children" not in wishes_cols:
+        db.execute("ALTER TABLE wishes ADD COLUMN words_children TEXT NOT NULL DEFAULT ''")
 
     user_cols = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
     if "terms_accepted_at" not in user_cols:
@@ -3389,6 +3402,7 @@ self.addEventListener('fetch', (event) => {
                 """
                 UPDATE wishes SET
                     farewell_message = ?, asset_notes = ?, ceremony_notes = ?,
+                    words_mother = ?, words_father = ?, words_partner = ?, words_children = ?,
                     bucket_list = ?, important_contacts = ?, external_links = ?, updated_by = ?, updated_at = ?
                 WHERE profile_id = ?
                 """,
@@ -3396,6 +3410,10 @@ self.addEventListener('fetch', (event) => {
                     request.form.get("farewell_message", "").strip(),
                     request.form.get("asset_notes", "").strip(),
                     request.form.get("ceremony_notes", "").strip(),
+                    request.form.get("words_mother", "").strip(),
+                    request.form.get("words_father", "").strip(),
+                    request.form.get("words_partner", "").strip(),
+                    request.form.get("words_children", "").strip(),
                     bucket_list_to_storage(bucket_items),
                     request.form.get("important_contacts", "").strip(),
                     request.form.get("external_links", "").strip(),

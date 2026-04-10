@@ -40,6 +40,33 @@
         <textarea class="form-control" name="important_contacts" rows="6" maxlength="4000" placeholder="Zum Beispiel: Notar, Pfarrer, enge Freunde, Vereinskontakte oder andere Personen, die informiert werden sollen." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['important_contacts'] }}</textarea>
       </div>
       <div class="col-12">
+        <label class="form-label">Letzte Worte an Ihre Familie</label>
+        <div class="subtle-card p-3">
+          <div class="small text-secondary mb-3">
+            Manchmal ist es schwer, in einem Moment an alles zu denken. Diese Felder helfen, niemanden zu vergessen. Alles ist freiwillig:
+            ein Satz reicht. Hinterbliebene können darin Trost, Dank und Orientierung finden.
+          </div>
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <label class="form-label small">An Mutter</label>
+              <textarea class="form-control" name="words_mother" rows="5" maxlength="4000" placeholder="Zum Beispiel: Dank, Erinnerungen, etwas, das Sie Ihrer Mutter noch sagen möchten." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['words_mother'] }}</textarea>
+            </div>
+            <div class="col-lg-6">
+              <label class="form-label small">An Vater</label>
+              <textarea class="form-control" name="words_father" rows="5" maxlength="4000" placeholder="Zum Beispiel: Worte, die Sie Ihrem Vater mitgeben möchten." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['words_father'] }}</textarea>
+            </div>
+            <div class="col-lg-6">
+              <label class="form-label small">An Partner</label>
+              <textarea class="form-control" name="words_partner" rows="5" maxlength="4000" placeholder="Zum Beispiel: Liebe Worte, Entlastung, Zuspruch, was Ihnen für Ihren Partner wichtig ist." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['words_partner'] }}</textarea>
+            </div>
+            <div class="col-lg-6">
+              <label class="form-label small">An Kinder</label>
+              <textarea class="form-control" name="words_children" rows="5" maxlength="4000" placeholder="Zum Beispiel: Ermutigung, Werte, Erinnerungen, was Sie Ihren Kindern mitgeben möchten." {% if g.user['id'] != profile['owner_user_id'] %}readonly{% endif %}>{{ wishes['words_children'] }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
         <label class="form-label">Bucket List (zum Abhaken)</label>
         <div class="subtle-card p-3">
           <div class="small text-secondary mb-3">Manchmal hilft es, in schweren Phasen auch Lebenswünsche sichtbar zu halten. Alles, was abgehakt ist, wird durchgestrichen angezeigt.</div>
