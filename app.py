@@ -31,6 +31,7 @@ from flask import (
     current_app,
     flash,
     g,
+    has_request_context,
     redirect,
     render_template,
     request,
@@ -878,6 +879,8 @@ def init_db(app: Flask) -> None:
         totp_enabled INTEGER NOT NULL DEFAULT 0,
         totp_backup_codes_encrypted TEXT NOT NULL DEFAULT '',
         totp_enabled_at TEXT,
+        annual_reminder_enabled INTEGER NOT NULL DEFAULT 1,
+        annual_reminder_last_sent_at TEXT,
         active INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -1064,6 +1067,11 @@ def init_db(app: Flask) -> None:
         db.execute("ALTER TABLE users ADD COLUMN totp_backup_codes_encrypted TEXT NOT NULL DEFAULT ''")
     if "totp_enabled_at" not in user_cols:
         db.execute("ALTER TABLE users ADD COLUMN totp_enabled_at TEXT")
+    user_cols = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "annual_reminder_enabled" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN annual_reminder_enabled INTEGER NOT NULL DEFAULT 1")
+    if "annual_reminder_last_sent_at" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN annual_reminder_last_sent_at TEXT")
 
     doc_cols = {row["name"] for row in db.execute("PRAGMA table_info(documents)").fetchall()}
     if "size_bytes" not in doc_cols:
@@ -1852,6 +1860,141 @@ def send_test_or_reset_mail(
         return False, f"Versand fehlgeschlagen: {exc}"
 
 
+def get_public_base_url_from_db(db: sqlite3.Connection) -> str:
+    # Prefer explicit base URL; otherwise use localhost as a safe fallback for jobs.
+    try:
+        row = db.execute("SELECT public_base_url FROM app_settings WHERE id = 1").fetchone()
+        value = (row["public_base_url"] if row else "") or ""
+        value = value.strip().rstrip("/")
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+    except Exception:
+        pass
+    return "http://127.0.0.1:8000"
+
+
+def log_system_event(
+    db: sqlite3.Connection,
+    event_type: str,
+    area: str,
+    detail: str,
+    *,
+    user_id: int | None = None,
+    profile_id: int | None = None,
+) -> None:
+    db.execute(
+        """
+        INSERT INTO activity_logs (
+            user_id, actor_name, profile_id, event_type, area, detail,
+            request_path, ip_address, user_agent, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            user_id,
+            "System",
+            profile_id,
+            event_type,
+            area,
+            detail,
+            "/system/reminder",
+            "system",
+            "system",
+            utcnow(),
+        ),
+    )
+    db.commit()
+
+
+def run_annual_reminder_job() -> dict[str, Any]:
+    """
+    Sends at most one reminder per creator per year (opt-out via account settings).
+    Intended to be run from a systemd timer.
+    """
+    db = get_db(current_app)
+    init_db(current_app)  # ensure migrations exist even if DB is old
+    smtp_settings = db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
+    if not is_smtp_configured(smtp_settings):
+        return {"sent": 0, "skipped": 0, "reason": "smtp_not_configured"}
+
+    base = get_public_base_url_from_db(db)
+    login_url = f"{base}{url_for('login')}"
+    dashboard_url = f"{base}{url_for('dashboard')}"
+    account_url = f"{base}{url_for('account_settings')}"
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=365)
+    sent = 0
+    skipped = 0
+
+    rows = db.execute(
+        """
+        SELECT id, display_name, email, email_verified_at, annual_reminder_enabled, annual_reminder_last_sent_at
+        FROM users
+        WHERE active = 1 AND is_creator = 1 AND annual_reminder_enabled = 1
+        ORDER BY id ASC
+        """
+    ).fetchall()
+
+    for user in rows:
+        if not user["email_verified_at"]:
+            skipped += 1
+            continue
+        last_raw = (user["annual_reminder_last_sent_at"] or "").strip()
+        if last_raw:
+            try:
+                last_dt = datetime.fromisoformat(last_raw)
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=timezone.utc)
+                if last_dt >= cutoff:
+                    skipped += 1
+                    continue
+            except Exception:
+                # If parsing fails, send again (but fix the stored value afterwards).
+                pass
+
+        subject = "BackUpLife: Jahres-Check (kurz prüfen)"
+        text = (
+            f"Hallo {user['display_name']},\n\n"
+            "einmal im Jahr dieser kurze Hinweis: Prüfen Sie bitte, ob Ihre Einträge noch aktuell sind "
+            "(z. B. E-Mail/Smartphone, wichtige Verträge/Versicherungen und der Notfall-Link).\n\n"
+            f"Zum Login: {login_url}\n"
+            f"Zum Dashboard: {dashboard_url}\n\n"
+            f"Diese Erinnerung können Sie in Ihrem Konto abschalten: {account_url}\n"
+        )
+        html = render_email_html(
+            "Jahres-Check",
+            "Ein kurzer, freundlicher Hinweis, damit im Ernstfall alles stimmt.",
+            [
+                f"Hallo {user['display_name']},",
+                "einmal im Jahr dieser kurze Hinweis: Prüfen Sie bitte, ob Ihre Einträge noch aktuell sind.",
+                "Oft lohnt sich ein Blick auf E-Mail/Smartphone, wichtige Verträge/Versicherungen und den Notfall-Link.",
+                "Wenn gerade keine Zeit ist: auch 5 Minuten reichen, um die wichtigsten Punkte zu prüfen.",
+            ],
+            "Zum Dashboard",
+            dashboard_url,
+            "Sie können diese Erinnerung jederzeit im Konto deaktivieren.",
+            base_url=base,
+        )
+        ok, _msg = send_test_or_reset_mail(smtp_settings, user["email"], subject, text, html)
+        if ok:
+            db.execute(
+                "UPDATE users SET annual_reminder_last_sent_at = ?, updated_at = ? WHERE id = ?",
+                (now.replace(microsecond=0).isoformat(), utcnow(), user["id"]),
+            )
+            db.commit()
+            log_system_event(
+                db,
+                "annual_reminder_sent",
+                "reminder",
+                f"Jahres-Erinnerung gesendet an {user['email']}",
+                user_id=user["id"],
+            )
+            sent += 1
+        else:
+            skipped += 1
+    return {"sent": sent, "skipped": skipped, "reason": "ok"}
+
+
 def issue_email_verification(user_id: int, email: str, display_name: str) -> tuple[bool, str]:
     smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
     if not is_smtp_configured(smtp_settings):
@@ -1901,8 +2044,16 @@ def render_email_html(
     button_label: str | None = None,
     button_url: str | None = None,
     footer_note: str | None = None,
+    *,
+    base_url: str | None = None,
 ) -> str:
-    logo_url = build_external_url("logo_asset") if request else ""
+    base = (base_url or "").strip().rstrip("/")
+    if not base and has_request_context():
+        try:
+            base = (getattr(g, "public_base_url", None) or request.url_root.rstrip("/")).rstrip("/")
+        except Exception:
+            base = ""
+    logo_url = f"{base}/branding/logo.png" if base else ""
     lines_html = "".join(
         f"<p style='margin:0 0 14px;color:#39566f;line-height:1.7;font-size:15px;'>{line}</p>"
         for line in body_lines
@@ -1924,6 +2075,7 @@ def render_email_html(
         </div>
         """
     footer_text = footer_note or "Diese Nachricht wurde von BackUpLife erstellt, um wichtige Informationen nachvollziehbar und sicher zu begleiten."
+    fallback_url = button_url or base or ""
     return f"""
     <!doctype html>
     <html lang="de">
@@ -1941,13 +2093,13 @@ def render_email_html(
             <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(16,54,84,0.12);font-size:13px;color:#6e8395;line-height:1.7;">
               <p style="margin:0 0 8px;"><strong style="color:#103654;">BackUpLife</strong></p>
               <p style="margin:0 0 8px;">{footer_text}</p>
-              <p style="margin:0;">Falls der Button nicht funktioniert, nutzen Sie bitte diesen Link:<br><span style="word-break:break-all;color:#206ca6;">{button_url or (getattr(g, 'public_base_url', None) or request.url_root.rstrip('/'))}</span></p>
-            </div>
-          </div>
-        </div>
-      </body>
-    </html>
-    """
+	              <p style="margin:0;">Falls der Button nicht funktioniert, nutzen Sie bitte diesen Link:<br><span style="word-break:break-all;color:#206ca6;">{fallback_url}</span></p>
+	            </div>
+	          </div>
+	        </div>
+	      </body>
+	    </html>
+	    """
 
 
 def register_routes(app: Flask) -> None:
@@ -2585,6 +2737,21 @@ self.addEventListener('fetch', (event) => {
                     g.db.commit()
                     log_event("account_password_change", "account", "Passwort geändert", user_id=g.user["id"])
                     push_toast("Ihr Passwort wurde aktualisiert.", "success", "Passwort geändert")
+                return redirect(url_for("account_settings"))
+            if form_id == "notifications":
+                enabled = 1 if request.form.get("annual_reminder_enabled") else 0
+                g.db.execute(
+                    "UPDATE users SET annual_reminder_enabled = ?, updated_at = ? WHERE id = ?",
+                    (enabled, utcnow(), g.user["id"]),
+                )
+                g.db.commit()
+                log_event(
+                    "account_notifications_update",
+                    "account",
+                    f"Jahres-Erinnerung {'aktiviert' if enabled else 'deaktiviert'}",
+                    user_id=g.user["id"],
+                )
+                push_toast("Benachrichtigungen wurden gespeichert.", "success", "Benachrichtigungen")
                 return redirect(url_for("account_settings"))
             if form_id == "totp_begin":
                 password = request.form.get("password", "")

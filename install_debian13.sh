@@ -3,6 +3,8 @@ set -euo pipefail
 
 APP_DIR="/opt/backuplife"
 SERVICE_FILE="/etc/systemd/system/backuplife.service"
+REMINDER_SERVICE_FILE="/etc/systemd/system/backuplife-reminder.service"
+REMINDER_TIMER_FILE="/etc/systemd/system/backuplife-reminder.timer"
 NGINX_FILE="/etc/nginx/sites-available/backuplife"
 DOMAIN="${1:-_}"
 APP_USER="backuplife"
@@ -109,6 +111,34 @@ Group=$APP_USER
 WantedBy=multi-user.target
 EOF
 
+cat > "$REMINDER_SERVICE_FILE" <<EOF
+[Unit]
+Description=BackUpLife annual reminder job
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$APP_DIR
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=$ENV_FILE
+ExecStart=$APP_DIR/.venv/bin/python $APP_DIR/scripts/annual_reminder_job.py
+User=$APP_USER
+Group=$APP_USER
+EOF
+
+cat > "$REMINDER_TIMER_FILE" <<EOF
+[Unit]
+Description=Run BackUpLife annual reminder job daily
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+RandomizedDelaySec=3600
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
 cat > "$NGINX_FILE" <<EOF
 server {
     listen 80;
@@ -130,6 +160,7 @@ rm -f /etc/nginx/sites-enabled/default
 
 systemctl daemon-reload
 systemctl enable --now backuplife
+systemctl enable --now backuplife-reminder.timer
 nginx -t
 systemctl restart nginx
 
