@@ -96,7 +96,7 @@ APP_CATEGORIES = [
     ("contracts", "Verträge"),
     ("insurances", "Versicherungen"),
     ("documents", "Nachlassdokumente"),
-    ("important_items", "Unterlagen & Notgroschen"),
+    ("important_items", "Allgemeines"),
     ("home_network", "Heimnetz & Smarthome"),
 ]
 
