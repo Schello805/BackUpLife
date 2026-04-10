@@ -1484,7 +1484,15 @@ def log_event(
     profile_id: int | None = None,
     user_id: int | None = None,
 ) -> None:
-    actor = g.user["display_name"] if g.user else "Gast"
+    actor = g.user["display_name"] if g.user else ""
+    if not actor and user_id:
+        try:
+            row = g.db.execute("SELECT display_name FROM users WHERE id = ?", (user_id,)).fetchone()
+            actor = (row["display_name"] if row else "") or ""
+        except Exception:
+            actor = ""
+    if not actor:
+        actor = "Gast"
     g.db.execute(
         """
         INSERT INTO activity_logs (
