@@ -182,6 +182,12 @@ echo
 echo "Status:"
 systemctl --no-pager --full status backuplife || true
 echo
+echo "Reminder Timer:"
+systemctl --no-pager --full status backuplife-reminder.timer || true
+echo
+echo "Alle BackUpLife Timer:"
+systemctl list-timers --all --no-pager | grep -i backuplife || true
+echo
 echo "Letzte Logs:"
 journalctl -u backuplife -n 30 --no-pager || true
 echo
