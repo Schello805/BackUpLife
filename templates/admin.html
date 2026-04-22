@@ -79,6 +79,24 @@
             <label class="form-check-label" for="registration_invite_clear">Einladungscode entfernen</label>
           </div>
         </div>
+        <div class="col-md-6">
+          <label class="form-label">Admin-IP-Allowlist (optional)</label>
+          <input class="form-control" name="admin_ip_allowlist" placeholder="z. B. 127.0.0.1/32,10.0.0.0/8" value="{{ app_settings['admin_ip_allowlist'] if app_settings else '' }}">
+          <div class="form-text">Wenn gesetzt, sind Admin-Endpunkte nur aus diesen IPs/Netzen erreichbar.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Google reCAPTCHA v3 Site Key (optional)</label>
+          <input class="form-control" name="recaptcha_site_key" placeholder="leer lassen = unverändert" value="{{ app_settings['recaptcha_site_key'] if app_settings else '' }}">
+          <div class="form-text">Wenn gesetzt, wird reCAPTCHA v3 für Registrierung/Link erneut senden/Passwort-Reset verwendet.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Google reCAPTCHA v3 Secret Key (optional)</label>
+          <input class="form-control" name="recaptcha_secret_key" type="password" placeholder="leer lassen = unverändert">
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="recaptcha_secret_clear" id="recaptcha_secret_clear">
+            <label class="form-check-label" for="recaptcha_secret_clear">Secret entfernen</label>
+          </div>
+        </div>
         <div class="col-12 d-flex justify-content-end">
           <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
         </div>

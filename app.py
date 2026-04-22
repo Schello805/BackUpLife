@@ -53,7 +53,7 @@ BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
 DEFAULT_DB_PATH = INSTANCE_DIR / "aeterna.db"
 DEFAULT_UPLOAD_DIR = INSTANCE_DIR / "uploads"
-APP_VERSION = "0.1.3"
+APP_VERSION = "0.1.4"
 TERMS_VERSION = "2026-04-10"
 GITHUB_REPO = "Schello805/BackUpLife"
 GITHUB_PROJECT_URL = "https://github.com/Schello805/BackUpLife"
@@ -69,6 +69,7 @@ DEFAULT_RATE_LIMIT_LOGIN = 20
 DEFAULT_RATE_LIMIT_REGISTER = 10
 DEFAULT_RATE_LIMIT_FORGOT = 10
 DEFAULT_SESSION_LIFETIME_MINUTES = 120
+DEFAULT_RECAPTCHA_MIN_SCORE = 0.5
 
 LOCAL_TZ = timezone.utc
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -619,6 +620,41 @@ def verify_turnstile(response_token: str, ip: str) -> bool:
         return False
 
 
+def verify_recaptcha_v3(response_token: str, ip: str, action: str) -> bool:
+    secret = (get_recaptcha_secret() or os.environ.get("BACKUPLIFE_RECAPTCHA_SECRET_KEY") or "").strip()
+    if not secret:
+        return True
+    token = (response_token or "").strip()
+    if not token:
+        return False
+    try:
+        min_score = float(os.environ.get("BACKUPLIFE_RECAPTCHA_MIN_SCORE", str(DEFAULT_RECAPTCHA_MIN_SCORE)))
+    except ValueError:
+        min_score = DEFAULT_RECAPTCHA_MIN_SCORE
+    min_score = max(0.0, min(float(min_score), 1.0))
+    payload = urlencode({"secret": secret, "response": token, "remoteip": (ip or "").strip()}).encode("utf-8")
+    try:
+        req = Request(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if not data.get("success"):
+            return False
+        if (data.get("action") or "") != (action or ""):
+            return False
+        try:
+            score = float(data.get("score", 0.0))
+        except (TypeError, ValueError):
+            score = 0.0
+        return score >= min_score
+    except Exception:
+        return False
+
+
 def is_smtp_configured(row: sqlite3.Row | None) -> bool:
     if not row:
         return False
@@ -641,6 +677,30 @@ def get_registration_invite_hash() -> str:
     try:
         row = get_app_settings_row()
         return (row["registration_invite_hash"] or "").strip()
+    except Exception:
+        return ""
+
+
+def get_admin_ip_allowlist_raw() -> str:
+    try:
+        row = get_app_settings_row()
+        return (row["admin_ip_allowlist"] or "").strip()
+    except Exception:
+        return ""
+
+
+def get_recaptcha_site_key() -> str:
+    try:
+        row = get_app_settings_row()
+        return (row["recaptcha_site_key"] or "").strip()
+    except Exception:
+        return ""
+
+
+def get_recaptcha_secret() -> str:
+    try:
+        row = get_app_settings_row()
+        return decrypt_secret(row["recaptcha_secret_encrypted"] or "")
     except Exception:
         return ""
 
@@ -1059,7 +1119,10 @@ def init_db(app: Flask) -> None:
         allow_registration INTEGER NOT NULL DEFAULT 0,
         require_email_verification INTEGER NOT NULL DEFAULT 1,
         max_profile_storage_mb INTEGER NOT NULL DEFAULT 100,
+        admin_ip_allowlist TEXT NOT NULL DEFAULT '',
         registration_invite_hash TEXT NOT NULL DEFAULT '',
+        recaptcha_site_key TEXT NOT NULL DEFAULT '',
+        recaptcha_secret_encrypted TEXT NOT NULL DEFAULT '',
         backup_password_encrypted TEXT NOT NULL DEFAULT '',
         updated_by INTEGER,
         updated_at TEXT NOT NULL DEFAULT ''
@@ -1192,8 +1255,14 @@ def init_db(app: Flask) -> None:
         db.execute("ALTER TABLE app_settings ADD COLUMN require_email_verification INTEGER NOT NULL DEFAULT 1")
     if "max_profile_storage_mb" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN max_profile_storage_mb INTEGER NOT NULL DEFAULT 100")
+    if "admin_ip_allowlist" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN admin_ip_allowlist TEXT NOT NULL DEFAULT ''")
     if "registration_invite_hash" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN registration_invite_hash TEXT NOT NULL DEFAULT ''")
+    if "recaptcha_site_key" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN recaptcha_site_key TEXT NOT NULL DEFAULT ''")
+    if "recaptcha_secret_encrypted" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN recaptcha_secret_encrypted TEXT NOT NULL DEFAULT ''")
     if "backup_password_encrypted" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN backup_password_encrypted TEXT NOT NULL DEFAULT ''")
 
@@ -1572,6 +1641,8 @@ def admin_required(view):
         if not g.user or not g.user["is_admin"]:
             abort(403)
         allowlist = current_app.config.get("ADMIN_IP_ALLOWLIST") or []
+        if not allowlist:
+            allowlist = parse_ip_allowlist(get_admin_ip_allowlist_raw())
         if allowlist and not ip_allowed(get_client_ip(), allowlist):
             abort(403)
         return view(*args, **kwargs)
@@ -2526,17 +2597,30 @@ self.addEventListener('fetch', (event) => {
             return redirect(url_for("setup"))
         if g.user:
             return redirect(url_for("dashboard"))
+        recaptcha_site_key = get_recaptcha_site_key() or (os.environ.get("BACKUPLIFE_RECAPTCHA_SITE_KEY") or "").strip()
         if not get_allow_registration():
             push_toast("Die Registrierung ist aktuell deaktiviert.", "danger", "Registrierung nicht möglich")
             return render_template(
                 "register.html",
                 form_values=None,
                 invite_required=bool(get_registration_invite_hash()),
+                recaptcha_site_key=recaptcha_site_key,
                 turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
             ), 403
         if request.method == "POST":
             ip = get_client_ip()
-            if current_app.config.get("TURNSTILE_SITE_KEY"):
+            if recaptcha_site_key:
+                token = request.form.get("g-recaptcha-response", "")
+                if not verify_recaptcha_v3(token, ip, "register"):
+                    push_toast("Captcha fehlgeschlagen. Bitte versuchen Sie es erneut.", "danger", "Captcha")
+                    return render_template(
+                        "register.html",
+                        form_values=None,
+                        invite_required=bool(get_registration_invite_hash()),
+                        recaptcha_site_key=recaptcha_site_key,
+                        turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                    ), 400
+            elif current_app.config.get("TURNSTILE_SITE_KEY"):
                 token = request.form.get("cf-turnstile-response", "")
                 if not verify_turnstile(token, ip):
                     push_toast("Bitte bestätigen Sie das Captcha und versuchen Sie es erneut.", "danger", "Captcha fehlgeschlagen")
@@ -2544,6 +2628,7 @@ self.addEventListener('fetch', (event) => {
                         "register.html",
                         form_values=None,
                         invite_required=bool(get_registration_invite_hash()),
+                        recaptcha_site_key=recaptcha_site_key,
                         turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                     ), 400
             if not rate_limit_check(
@@ -2561,6 +2646,7 @@ self.addEventListener('fetch', (event) => {
                     "register.html",
                     form_values=None,
                     invite_required=bool(get_registration_invite_hash()),
+                    recaptcha_site_key=recaptcha_site_key,
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 ), 429
             errors, data = validate_user_form(request.form)
@@ -2580,6 +2666,7 @@ self.addEventListener('fetch', (event) => {
                     "register.html",
                     form_values=data,
                     invite_required=bool(invite_hash),
+                    recaptcha_site_key=recaptcha_site_key,
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 )
             require_verification = get_require_email_verification()
@@ -2594,6 +2681,7 @@ self.addEventListener('fetch', (event) => {
                     "register.html",
                     form_values=data,
                     invite_required=bool(invite_hash),
+                    recaptcha_site_key=recaptcha_site_key,
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 )
             try:
@@ -2620,6 +2708,7 @@ self.addEventListener('fetch', (event) => {
                             "register.html",
                             form_values=data,
                             invite_required=bool(invite_hash),
+                            recaptcha_site_key=recaptcha_site_key,
                             turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                         )
                 push_toast(
@@ -2634,12 +2723,14 @@ self.addEventListener('fetch', (event) => {
                     "register.html",
                     form_values=data,
                     invite_required=bool(invite_hash),
+                    recaptcha_site_key=recaptcha_site_key,
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 )
         return render_template(
             "register.html",
             form_values=None,
             invite_required=bool(get_registration_invite_hash()),
+            recaptcha_site_key=recaptcha_site_key,
             turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
         )
 
@@ -2682,16 +2773,28 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/email-bestaetigen", methods=["GET", "POST"])
     def resend_verification():
+        recaptcha_site_key = get_recaptcha_site_key() or (os.environ.get("BACKUPLIFE_RECAPTCHA_SITE_KEY") or "").strip()
         if request.method == "POST":
             email = normalize_email(request.form.get("email", ""))
             ip = get_client_ip()
-            if current_app.config.get("TURNSTILE_SITE_KEY"):
+            if recaptcha_site_key:
+                token = request.form.get("g-recaptcha-response", "")
+                if not verify_recaptcha_v3(token, ip, "resend_verification"):
+                    push_toast("Captcha fehlgeschlagen. Bitte versuchen Sie es erneut.", "danger", "Captcha")
+                    return render_template(
+                        "resend_verification.html",
+                        email=email,
+                        recaptcha_site_key=recaptcha_site_key,
+                        turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                    ), 400
+            elif current_app.config.get("TURNSTILE_SITE_KEY"):
                 token = request.form.get("cf-turnstile-response", "")
                 if not verify_turnstile(token, ip):
                     push_toast("Bitte bestätigen Sie das Captcha und versuchen Sie es erneut.", "danger", "Captcha fehlgeschlagen")
                     return render_template(
                         "resend_verification.html",
                         email=email,
+                        recaptcha_site_key=recaptcha_site_key,
                         turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                     ), 400
             if not rate_limit_check(
@@ -2704,6 +2807,7 @@ self.addEventListener('fetch', (event) => {
                 return render_template(
                     "resend_verification.html",
                     email=email,
+                    recaptcha_site_key=recaptcha_site_key,
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 ), 429
             user = g.db.execute("SELECT * FROM users WHERE lower(email) = ? AND active = 1", (email,)).fetchone()
@@ -2720,12 +2824,14 @@ self.addEventListener('fetch', (event) => {
             return render_template(
                 "resend_verification.html",
                 email=email,
+                recaptcha_site_key=recaptcha_site_key,
                 turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
             )
         email = request.args.get("email", "")
         return render_template(
             "resend_verification.html",
             email=email,
+            recaptcha_site_key=recaptcha_site_key,
             turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
         )
 
@@ -2739,14 +2845,25 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/passwort-vergessen", methods=["GET", "POST"])
     def forgot_password():
+        recaptcha_site_key = get_recaptcha_site_key() or (os.environ.get("BACKUPLIFE_RECAPTCHA_SITE_KEY") or "").strip()
         if request.method == "POST":
             ip = get_client_ip()
-            if current_app.config.get("TURNSTILE_SITE_KEY"):
+            if recaptcha_site_key:
+                token = request.form.get("g-recaptcha-response", "")
+                if not verify_recaptcha_v3(token, ip, "forgot_password"):
+                    push_toast("Captcha fehlgeschlagen. Bitte versuchen Sie es erneut.", "danger", "Captcha")
+                    return render_template(
+                        "forgot_password.html",
+                        recaptcha_site_key=recaptcha_site_key,
+                        turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                    ), 400
+            elif current_app.config.get("TURNSTILE_SITE_KEY"):
                 token = request.form.get("cf-turnstile-response", "")
                 if not verify_turnstile(token, ip):
                     push_toast("Bitte bestätigen Sie das Captcha und versuchen Sie es erneut.", "danger", "Captcha fehlgeschlagen")
                     return render_template(
                         "forgot_password.html",
+                        recaptcha_site_key=recaptcha_site_key,
                         turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                     ), 400
             if not rate_limit_check(
@@ -2758,6 +2875,7 @@ self.addEventListener('fetch', (event) => {
                 push_toast("Bitte warten Sie kurz, bevor Sie es erneut versuchen.", "danger", "Zu viele Versuche")
                 return render_template(
                     "forgot_password.html",
+                    recaptcha_site_key=recaptcha_site_key,
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 ), 429
             email = normalize_email(request.form.get("email", ""))
@@ -2799,6 +2917,7 @@ self.addEventListener('fetch', (event) => {
             return redirect(url_for("login"))
         return render_template(
             "forgot_password.html",
+            recaptcha_site_key=recaptcha_site_key,
             turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
         )
 
@@ -3910,6 +4029,7 @@ self.addEventListener('fetch', (event) => {
                 except ValueError:
                     max_mb = DEFAULT_PROFILE_STORAGE_MB
                 max_mb = max(10, min(max_mb, 1024))
+                admin_ip_allowlist = (request.form.get("admin_ip_allowlist") or "").strip()
                 invite_code = (request.form.get("registration_invite_code") or "").strip()
                 invite_clear = bool(request.form.get("registration_invite_clear"))
                 existing = (app_settings["registration_invite_hash"] or "") if app_settings else ""
@@ -3918,18 +4038,46 @@ self.addEventListener('fetch', (event) => {
                     invite_hash = ""
                 elif invite_code:
                     invite_hash = hash_invite_code(invite_code)
+
+                recaptcha_site_key = (request.form.get("recaptcha_site_key") or "").strip()
+                recaptcha_secret = (request.form.get("recaptcha_secret_key") or "").strip()
+                recaptcha_clear = bool(request.form.get("recaptcha_secret_clear"))
+                recaptcha_site_existing = (app_settings["recaptcha_site_key"] or "") if app_settings else ""
+                recaptcha_secret_existing = (app_settings["recaptcha_secret_encrypted"] or "") if app_settings else ""
+                recaptcha_site_final = recaptcha_site_existing
+                recaptcha_secret_final = recaptcha_secret_existing
+                if recaptcha_site_key:
+                    recaptcha_site_final = recaptcha_site_key
+                if recaptcha_clear:
+                    recaptcha_secret_final = ""
+                elif recaptcha_secret:
+                    recaptcha_secret_final = encrypt_secret(recaptcha_secret)
+
+                allowlist = parse_ip_allowlist(admin_ip_allowlist)
+                if allowlist and not ip_allowed(get_client_ip(), allowlist):
+                    push_toast(
+                        "Diese IP-Allowlist würde Sie aussperren. Bitte fügen Sie Ihre aktuelle IP hinzu oder lassen Sie das Feld leer.",
+                        "danger",
+                        "Admin-IP-Allowlist",
+                    )
+                    return redirect(url_for("admin"))
                 g.db.execute(
                     """
                     UPDATE app_settings
                     SET allow_registration = ?, require_email_verification = ?, max_profile_storage_mb = ?,
-                        registration_invite_hash = ?, updated_by = ?, updated_at = ?
+                        admin_ip_allowlist = ?, registration_invite_hash = ?,
+                        recaptcha_site_key = ?, recaptcha_secret_encrypted = ?,
+                        updated_by = ?, updated_at = ?
                     WHERE id = 1
                     """,
                     (
                         allow_registration,
                         require_email_verification,
                         max_mb,
+                        admin_ip_allowlist,
                         invite_hash,
+                        recaptcha_site_final,
+                        recaptcha_secret_final,
                         g.user["id"],
                         utcnow(),
                     ),
