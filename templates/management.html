@@ -23,26 +23,26 @@
 
   {% if owned_profile %}
     <div class="row g-4 mb-4">
-      <div class="col-xl-5">
-        <div class="page-shell p-4 h-100">
-          <div class="section-label mb-2">Benutzerverwaltung</div>
-          <h2 class="h4 mb-3">Gib deinen digitalen Nachlass an eine vertrauensvolle Person frei</h2>
-          <form method="post" action="{{ url_for('create_user') }}" class="vstack gap-3" novalidate>
-            {{ csrf_input() }}
-            <input class="form-control" name="display_name" minlength="2" placeholder="Name" required>
-            <input type="email" class="form-control" name="email" placeholder="E-Mail-Adresse" required>
-            <input type="password" class="form-control" name="password" placeholder="Passwort mit mindestens 10 Zeichen" minlength="10" required>
-            <select class="form-select" name="role">
-              <option value="reader">Leser</option>
-              {% if g.user['is_admin'] %}
+      {% if g.user['is_admin'] %}
+        <div class="col-xl-5">
+          <div class="page-shell p-4 h-100">
+            <div class="section-label mb-2">Benutzerverwaltung</div>
+            <h2 class="h4 mb-3">Gib deinen digitalen Nachlass an eine vertrauensvolle Person frei</h2>
+            <form method="post" action="{{ url_for('create_user') }}" class="vstack gap-3" novalidate>
+              {{ csrf_input() }}
+              <input class="form-control" name="display_name" minlength="2" placeholder="Name" required>
+              <input type="email" class="form-control" name="email" placeholder="E-Mail-Adresse" required>
+              <input type="password" class="form-control" name="password" placeholder="Passwort mit mindestens 10 Zeichen" minlength="10" required>
+              <select class="form-select" name="role">
+                <option value="reader">Leser</option>
                 <option value="creator">Ersteller</option>
-              {% endif %}
-            </select>
-            <button class="btn btn-primary">Benutzer speichern</button>
-          </form>
+              </select>
+              <button class="btn btn-primary">Benutzer speichern</button>
+            </form>
+          </div>
         </div>
-      </div>
-      <div class="col-xl-7">
+      {% endif %}
+      <div class="{% if g.user['is_admin'] %}col-xl-7{% else %}col-12{% endif %}">
         <div class="page-shell p-4 h-100">
           <div class="section-label mb-2">Freigaben</div>
           <h2 class="h4 mb-3">Zugriff bewusst und nachvollziehbar vergeben</h2>
@@ -107,53 +107,55 @@
       </div>
     </div>
 
-    <div class="page-shell p-4 mb-4">
-      <div class="section-label mb-2">Bestehende Konten</div>
-      <h2 class="h4 mb-3">Wer bereits eingebunden ist</h2>
-      <div class="surface-table">
-        <div class="table-responsive">
-          <table class="table align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>Name</th>
-                <th>Rolle</th>
-                <th>Status</th>
-                <th class="text-end">Aktion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for user in users %}
+    {% if g.user['is_admin'] %}
+      <div class="page-shell p-4 mb-4">
+        <div class="section-label mb-2">Bestehende Konten</div>
+        <h2 class="h4 mb-3">Wer bereits eingebunden ist</h2>
+        <div class="surface-table">
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
                 <tr>
-                  <td>{{ user['display_name'] }}<div class="small text-secondary">{{ user['email'] }}</div></td>
-                  <td>{% if user['is_admin'] %}Admin{% elif user['is_creator'] %}Ersteller{% else %}Leser{% endif %}</td>
-                  <td>{{ 'Aktiv' if user['active'] else 'Deaktiviert' }}</td>
-                  <td class="text-end">
-                    {% if user['id'] != g.user['id'] %}
-                      <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
-                        <form method="post" action="{{ url_for('toggle_user_status', user_id=user['id']) }}">
-                          {{ csrf_input() }}
-                          <button class="btn btn-outline-secondary btn-sm">{{ 'Aktivieren' if not user['active'] else 'Deaktivieren' }}</button>
-                        </form>
-                        {% if not user['is_admin'] and (not user['is_creator'] or g.user['is_admin']) %}
-                          {% set delete_msg = 'Dieser Benutzer ist Ersteller. Beim Löschen wird auch sein kompletter Nachlass entfernt. Wirklich löschen?' if user['is_creator'] else 'Benutzer wirklich löschen? Alle Freigaben werden entfernt.' %}
-                          <form method="post" action="{{ url_for('delete_user', user_id=user['id']) }}">
-                            {{ csrf_input() }}
-                            <button
-                              class="btn btn-outline-danger btn-sm"
-                              onclick="return confirm('{{ delete_msg|e }}')"
-                            >Löschen</button>
-                          </form>
-                        {% endif %}
-                      </div>
-                    {% endif %}
-                  </td>
+                  <th>Name</th>
+                  <th>Rolle</th>
+                  <th>Status</th>
+                  <th class="text-end">Aktion</th>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {% for user in users %}
+                  <tr>
+                    <td>{{ user['display_name'] }}<div class="small text-secondary">{{ user['email'] }}</div></td>
+                    <td>{% if user['is_admin'] %}Admin{% elif user['is_creator'] %}Ersteller{% else %}Leser{% endif %}</td>
+                    <td>{{ 'Aktiv' if user['active'] else 'Deaktiviert' }}</td>
+                    <td class="text-end">
+                      {% if user['id'] != g.user['id'] %}
+                        <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
+                          <form method="post" action="{{ url_for('toggle_user_status', user_id=user['id']) }}">
+                            {{ csrf_input() }}
+                            <button class="btn btn-outline-secondary btn-sm">{{ 'Aktivieren' if not user['active'] else 'Deaktivieren' }}</button>
+                          </form>
+                          {% if not user['is_admin'] %}
+                            {% set delete_msg = 'Dieser Benutzer ist Ersteller. Beim Löschen wird auch sein kompletter Nachlass entfernt. Wirklich löschen?' if user['is_creator'] else 'Benutzer wirklich löschen? Alle Freigaben werden entfernt.' %}
+                            <form method="post" action="{{ url_for('delete_user', user_id=user['id']) }}">
+                              {{ csrf_input() }}
+                              <button
+                                class="btn btn-outline-danger btn-sm"
+                                onclick="return confirm('{{ delete_msg|e }}')"
+                              >Löschen</button>
+                            </form>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+    {% endif %}
   {% endif %}
 
 	  <div class="page-shell p-4">

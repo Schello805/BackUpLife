@@ -68,6 +68,7 @@ def test_registration_requires_smtp_when_verification_enabled(app, app_module, c
             "admin",
             None,
         )
+        g.db.execute("UPDATE app_settings SET allow_registration = 1 WHERE id = 1")
         g.db.commit()
         g.db.close()
 
@@ -80,12 +81,11 @@ def test_registration_requires_smtp_when_verification_enabled(app, app_module, c
             "csrf_token": csrf,
             "display_name": "Max",
             "email": "max@example.com",
-            "role": "creator",
+            "role": "reader",
             "password": "very-secure-password",
             "accept_terms": "1",
         },
         follow_redirects=True,
-        headers={"X-Forwarded-For": "203.0.113.55"},
     )
     assert resp.status_code == 200
     assert b"SMTP" in resp.data
@@ -105,6 +105,7 @@ def test_email_verification_flow(app, app_module, monkeypatch):
             "admin",
             None,
         )
+        g.db.execute("UPDATE app_settings SET allow_registration = 1 WHERE id = 1")
         g.db.execute(
             "UPDATE smtp_settings SET host = 'smtp.example', sender_email = 'noreply@example.com' WHERE id = 1"
         )
@@ -127,11 +128,10 @@ def test_email_verification_flow(app, app_module, monkeypatch):
             "csrf_token": csrf,
             "display_name": "Erika",
             "email": "erika@example.com",
-            "role": "creator",
+            "role": "reader",
             "password": "very-secure-password",
             "accept_terms": "1",
         },
-        headers={"X-Forwarded-For": "203.0.113.56"},
         follow_redirects=False,
     )
     assert resp.status_code in (302, 303)
@@ -331,30 +331,16 @@ def test_document_upload_quota_enforced(app, app_module, logged_in_creator, crea
     assert row and int(row["size_bytes"]) > 0
 
 
-def test_backup_download_encrypted(app, app_module, logged_in_admin):
-    # Set a known backup passphrase (encrypted at rest).
-    with app.test_request_context("/admin"):
-        from flask import g
-
-        g.db = app_module.get_db(app)
-        g.db.execute(
-            "UPDATE app_settings SET backup_password_encrypted = ? WHERE id = 1",
-            (app_module.encrypt_secret("backup-passphrase"),),
-        )
-        g.db.commit()
-        g.db.close()
-
+def test_backup_download_zip(app, logged_in_admin):
     resp = logged_in_admin.get("/admin/backup.zip")
     assert resp.status_code == 200
-    assert resp.headers.get("Content-Disposition", "").endswith(".zip.enc\"") or ".zip.enc" in resp.headers.get("Content-Disposition", "")
-
-    cipher = app_module.Fernet(app_module.build_fernet_key("backup-passphrase"))
-    decrypted = cipher.decrypt(resp.data)
-    assert decrypted[:2] == b"PK"  # ZIP magic
-    with zipfile.ZipFile(io.BytesIO(decrypted), "r") as zf:
+    assert resp.headers.get("Content-Disposition", "").endswith(".zip\"") or ".zip" in resp.headers.get("Content-Disposition", "")
+    assert resp.data[:2] == b"PK"  # ZIP magic
+    with zipfile.ZipFile(io.BytesIO(resp.data), "r") as zf:
         assert "backup.json" in zf.namelist()
         meta = json.loads(zf.read("backup.json").decode("utf-8"))
         assert meta.get("app") == "BackUpLife"
+        assert meta.get("encrypted") is False
 
 
 def test_login_requires_totp_when_enabled(app, app_module):

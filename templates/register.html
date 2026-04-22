@@ -14,9 +14,9 @@
             </div>
           </div>
           <ul class="hint-list ps-0 mb-0">
-            <li><strong>Leser:</strong> sehen freigegebene Inhalte und können sie im Notfall nutzen</li>
-            <li><strong>Ersteller:</strong> ordnen den eigenen Nachlass mit Ruhe und Klarheit</li>
-            <li><strong>Admin:</strong> ist ausschließlich das erste Konto (Einrichtung) und verwaltet nur System-Einstellungen</li>
+            <li><strong>Registrierung:</strong> erstellt ein <strong>Leser</strong>-Konto (für freigegebene Inhalte)</li>
+            <li><strong>Ersteller</strong>-Konten werden aus Sicherheitsgründen nur vom Admin angelegt</li>
+            <li><strong>Admin</strong> ist ausschließlich das erste Konto (Einrichtung) und verwaltet System-Einstellungen</li>
           </ul>
         </div>
       </div>
@@ -36,12 +36,15 @@
               <input type="email" class="form-control" name="email" value="{{ values.get('email', '') }}" required>
             </div>
             <div>
-              <label class="form-label">Rolle</label>
-              <select class="form-select" name="role">
-                <option value="reader" {% if values.get('role') != 'creator' %}selected{% endif %}>Leser</option>
-                <option value="creator" {% if values.get('role') == 'creator' %}selected{% endif %}>Ersteller</option>
-              </select>
+              <input type="hidden" name="role" value="reader">
             </div>
+            {% if invite_required %}
+              <div>
+                <label class="form-label">Einladungscode</label>
+                <input class="form-control" name="invite_code" value="{{ values.get('invite_code', '') }}" required>
+                <div class="form-text">Diese Instanz erlaubt die Registrierung nur mit Einladungscode.</div>
+              </div>
+            {% endif %}
             <div>
               <label class="form-label">Passwort</label>
               <input type="password" class="form-control" name="password" minlength="10" required>
@@ -52,6 +55,30 @@
                 Ich habe die <a href="{{ url_for('terms_page') }}" target="_blank" rel="noreferrer">Nutzungsbedingungen</a> gelesen und akzeptiere sie.
               </label>
             </div>
+            {% if recaptcha_site_key %}
+              <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+              <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}" async defer></script>
+              <script>
+                (function () {
+                  const form = document.querySelector('form');
+                  const tokenInput = document.getElementById('g-recaptcha-response');
+                  if (!form || !tokenInput || typeof grecaptcha === 'undefined') return;
+                  form.addEventListener('submit', function (e) {
+                    if (tokenInput.value) return;
+                    e.preventDefault();
+                    grecaptcha.ready(function () {
+                      grecaptcha.execute('{{ recaptcha_site_key }}', {action: 'register'}).then(function (token) {
+                        tokenInput.value = token;
+                        form.submit();
+                      });
+                    });
+                  });
+                })();
+              </script>
+            {% elif turnstile_site_key %}
+              <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+              <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+            {% endif %}
             <button class="btn btn-primary">Registrieren</button>
           </form>
           <div class="mt-4 small">
