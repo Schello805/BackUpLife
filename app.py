@@ -4222,6 +4222,59 @@ self.addEventListener('fetch', (event) => {
             current_ip_private=current_ip_private,
         )
 
+    @app.route("/admin/logs")
+    @login_required
+    @admin_required
+    def admin_logs():
+        page_size = 100
+        try:
+            page = max(1, int(request.args.get("page", "1")))
+        except ValueError:
+            page = 1
+        offset = (page - 1) * page_size
+        q = (request.args.get("q") or "").strip()
+        event_type = (request.args.get("event_type") or "").strip()
+
+        where = []
+        params: list[Any] = []
+        if event_type:
+            where.append("activity_logs.event_type = ?")
+            params.append(event_type)
+        if q:
+            where.append(
+                "(activity_logs.actor_name LIKE ? OR activity_logs.detail LIKE ? OR activity_logs.request_path LIKE ? OR activity_logs.ip_address LIKE ?)"
+            )
+            like = f"%{q}%"
+            params.extend([like, like, like, like])
+
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        rows = g.db.execute(
+            f"""
+            SELECT activity_logs.*, profiles.slug
+            FROM activity_logs
+            LEFT JOIN profiles ON profiles.id = activity_logs.profile_id
+            {where_sql}
+            ORDER BY activity_logs.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (*params, page_size + 1, offset),
+        ).fetchall()
+        has_more = len(rows) > page_size
+        logs = rows[:page_size]
+
+        types = g.db.execute("SELECT DISTINCT event_type FROM activity_logs ORDER BY event_type COLLATE NOCASE").fetchall()
+        type_values = [row["event_type"] for row in types if row and row["event_type"]]
+
+        return render_template(
+            "admin_logs.html",
+            logs=logs,
+            page=page,
+            has_more=has_more,
+            q=q,
+            event_type=event_type,
+            event_types=type_values,
+        )
+
     @app.route("/admin/backup.zip")
     @login_required
     @admin_required

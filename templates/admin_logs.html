@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+{% block title %}Admin · Audit-Log{% endblock %}
+{% block content %}
+  <div class="page-shell p-4 p-lg-5 mb-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+      <div>
+        <p class="section-label mb-2">Admin</p>
+        <h1 class="h3 mb-2">Audit-Log (global)</h1>
+        <p class="text-secondary mb-0">Alle Logeinträge der Instanz – unabhängig von Nachlass/Freigaben.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin') }}">Zurück</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-shell p-4 mb-4">
+    <form method="get" class="row g-3 align-items-end" novalidate>
+      <div class="col-md-6">
+        <label class="form-label">Suche</label>
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Name, Detail, Pfad oder IP">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Event-Typ</label>
+        <select class="form-select" name="event_type">
+          <option value="">Alle</option>
+          {% for t in event_types %}
+            <option value="{{ t }}" {% if t == event_type %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button class="btn btn-primary w-100">Filtern</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="page-shell p-4">
+    <div class="surface-table">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Zeit</th>
+              <th>Akteur</th>
+              <th>Event</th>
+              <th>Aktion</th>
+              <th>Pfad</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+              <tr>
+                <td class="small">{{ dt_de(log['created_at']) }}</td>
+                <td>{{ log['actor_name'] }}</td>
+                <td class="small text-secondary">{{ log['event_type'] }}</td>
+                <td>{{ log['detail'] }}</td>
+                <td class="small">{{ log['request_path'] }}</td>
+                <td class="small">{{ log['ip_address'] }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="text-secondary">Keine Einträge.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+      <div class="small text-secondary">Seite {{ page }}</div>
+      <div class="d-flex gap-2">
+        {% if page > 1 %}
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_logs', page=page-1, q=q, event_type=event_type) }}">Zurück</a>
+        {% endif %}
+        {% if has_more %}
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_logs', page=page+1, q=q, event_type=event_type) }}">Weiter</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
