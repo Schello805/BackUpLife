@@ -62,7 +62,7 @@ BUILD_SHA = os.environ.get("BACKUPLIFE_BUILD_SHA", "").strip()
 BUILD_DATE = os.environ.get("BACKUPLIFE_BUILD_DATE", "").strip()
 DEFAULT_PROFILE_STORAGE_MB = 100
 DEFAULT_REQUIRE_EMAIL_VERIFICATION = 1
-DEFAULT_ALLOW_REGISTRATION = 1
+DEFAULT_ALLOW_REGISTRATION = 0
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
 DEFAULT_RATE_LIMIT_LOGIN = 20
 DEFAULT_RATE_LIMIT_REGISTER = 10
@@ -556,6 +556,17 @@ def require_csrf() -> None:
         abort(400)
 
 
+def get_client_ip() -> str:
+    # Prefer Werkzeug's resolved remote address. When BACKUPLIFE_TRUST_PROXY=1, ProxyFix already
+    # maps X-Forwarded-For onto request.remote_addr.
+    return (request.remote_addr or "").strip()
+
+
+def env_flag(name: str, default: str = "0") -> bool:
+    value = (os.environ.get(name, default) or "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def is_smtp_configured(row: sqlite3.Row | None) -> bool:
     if not row:
         return False
@@ -748,9 +759,8 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_SIZE
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"] = bool(
-        os.environ.get("BACKUPLIFE_COOKIE_SECURE") or os.environ.get("AETERNA_COOKIE_SECURE")
-    )
+    app.config["SESSION_COOKIE_SECURE"] = env_flag("BACKUPLIFE_COOKIE_SECURE") or env_flag("AETERNA_COOKIE_SECURE")
+    app.config["ENABLE_2FA"] = env_flag("BACKUPLIFE_ENABLE_2FA", "1")
     # Honor reverse-proxy headers for scheme/host/ip when explicitly enabled.
     if os.environ.get("BACKUPLIFE_TRUST_PROXY") == "1":
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
@@ -818,8 +828,8 @@ def create_app() -> Flask:
             return redirect(url_for("setup"))
 
         # Enforce that the (single) admin uses 2FA. Admin can still reach /konto to enable it.
-        enforce_admin_2fa = os.environ.get("BACKUPLIFE_ENFORCE_ADMIN_2FA", "1") == "1"
-        if enforce_admin_2fa and g.user and g.user["is_admin"] and not g.user["totp_enabled"]:
+        enforce_admin_2fa = env_flag("BACKUPLIFE_ENFORCE_ADMIN_2FA", "1")
+        if app.config.get("ENABLE_2FA") and enforce_admin_2fa and g.user and g.user["is_admin"] and not g.user["totp_enabled"]:
             allow_admin_endpoints = {
                 "account_settings",
                 "logout",
@@ -838,7 +848,8 @@ def create_app() -> Flask:
                 return redirect(url_for("account_settings"))
 
         # CSRF protection for state-changing requests.
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not request.is_json:
+        # Enforce for JSON too (clients can send X-CSRFToken).
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             endpoint = request.endpoint or ""
             if not endpoint.startswith("static"):
                 require_csrf()
@@ -983,7 +994,7 @@ def init_db(app: Flask) -> None:
         id INTEGER PRIMARY KEY CHECK (id = 1),
         timezone TEXT NOT NULL DEFAULT 'Europe/Berlin',
         public_base_url TEXT NOT NULL DEFAULT '',
-        allow_registration INTEGER NOT NULL DEFAULT 1,
+        allow_registration INTEGER NOT NULL DEFAULT 0,
         require_email_verification INTEGER NOT NULL DEFAULT 1,
         max_profile_storage_mb INTEGER NOT NULL DEFAULT 100,
         backup_password_encrypted TEXT NOT NULL DEFAULT '',
@@ -1113,7 +1124,7 @@ def init_db(app: Flask) -> None:
     if "public_base_url" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN public_base_url TEXT NOT NULL DEFAULT ''")
     if "allow_registration" not in app_cols:
-        db.execute("ALTER TABLE app_settings ADD COLUMN allow_registration INTEGER NOT NULL DEFAULT 1")
+        db.execute("ALTER TABLE app_settings ADD COLUMN allow_registration INTEGER NOT NULL DEFAULT 0")
     if "require_email_verification" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN require_email_verification INTEGER NOT NULL DEFAULT 1")
     if "max_profile_storage_mb" not in app_cols:
@@ -1541,7 +1552,7 @@ def log_event(
             area,
             detail,
             request.path,
-            request.headers.get("X-Forwarded-For", request.remote_addr or ""),
+            get_client_ip(),
             request.user_agent.string[:500],
             utcnow(),
         ),
@@ -2183,23 +2194,24 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/manifest.webmanifest")
     def manifest_webmanifest():
-        base = (g.public_base_url or request.url_root.rstrip("/")).rstrip("/")
+        # PWA manifests must be same-origin as the document. Keep URLs relative so that
+        # accessing the app via IP/localhost doesn't break installability.
         payload = {
             "name": "BackUpLife",
             "short_name": "BackUpLife",
-            "start_url": f"{base}/",
+            "start_url": "/",
             "scope": "/",
             "display": "standalone",
             "background_color": "#fbfcfe",
             "theme_color": "#103654",
             "icons": [
                 {
-                    "src": f"{base}{url_for('logo_asset')}",
+                    "src": url_for("logo_asset"),
                     "sizes": "192x192",
                     "type": "image/png",
                 },
                 {
-                    "src": f"{base}{url_for('logo_asset')}",
+                    "src": url_for("logo_asset"),
                     "sizes": "512x512",
                     "type": "image/png",
                 },
@@ -2229,7 +2241,7 @@ self.addEventListener('fetch', (event) => {
     def version_info():
         # Avoid leaking internals on public instances. Allow only local calls by default.
         # Admins can still see build info in the footer.
-        ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip() or "")
+        ip = get_client_ip()
         if os.environ.get("BACKUPLIFE_PUBLIC_VERSION_ENDPOINT") != "1" and ip not in ("127.0.0.1", "::1"):
             abort(404)
         info = get_build_info()
@@ -2297,7 +2309,7 @@ self.addEventListener('fetch', (event) => {
             return redirect(url_for("setup"))
         target_slug = request.args.get("target", "").strip()
         if request.method == "POST":
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            ip = get_client_ip()
             if not rate_limit_check(
                 "login",
                 ip or "unknown",
@@ -2339,7 +2351,7 @@ self.addEventListener('fetch', (event) => {
             else:
                 auth_throttle_clear(email, ip or "unknown")
                 session.clear()
-                if user["totp_enabled"]:
+                if app.config.get("ENABLE_2FA") and user["totp_enabled"]:
                     session["pre_2fa_user_id"] = user["id"]
                     session["pre_2fa_target_slug"] = target_slug
                     session["pre_2fa_next"] = request.args.get("next") or ""
@@ -2366,6 +2378,8 @@ self.addEventListener('fetch', (event) => {
     def login_2fa():
         if not g.system_initialized:
             return redirect(url_for("setup"))
+        if not current_app.config.get("ENABLE_2FA"):
+            return redirect(url_for("login"))
         pre_user_id = session.get("pre_2fa_user_id")
         if not pre_user_id:
             return redirect(url_for("login"))
@@ -2377,7 +2391,7 @@ self.addEventListener('fetch', (event) => {
             return redirect(url_for("login"))
 
         if request.method == "POST":
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            ip = get_client_ip()
             if not rate_limit_check(
                 "login2fa",
                 ip or "unknown",
@@ -2448,7 +2462,7 @@ self.addEventListener('fetch', (event) => {
             push_toast("Die Registrierung ist aktuell deaktiviert.", "danger", "Registrierung nicht möglich")
             return render_template("register.html", form_values=None), 403
         if request.method == "POST":
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            ip = get_client_ip()
             if not rate_limit_check(
                 "register",
                 ip or "unknown",
@@ -2465,11 +2479,7 @@ self.addEventListener('fetch', (event) => {
             if not request.form.get("accept_terms"):
                 errors = list(errors) + ["Bitte bestätigen Sie die Nutzungsbedingungen."]
             data["accept_terms"] = "1" if request.form.get("accept_terms") else ""
-            role = data["role"]
-            if role == "admin":
-                role = "reader"
-            if role not in {"reader", "creator"}:
-                role = "reader"
+            role = "reader"
             if errors:
                 for error in errors:
                     push_toast(error, "danger", "Registrierung fehlgeschlagen")
@@ -2556,7 +2566,7 @@ self.addEventListener('fetch', (event) => {
     def resend_verification():
         if request.method == "POST":
             email = normalize_email(request.form.get("email", ""))
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            ip = get_client_ip()
             if not rate_limit_check(
                 "resend_verification",
                 ip or "unknown",
@@ -2591,7 +2601,7 @@ self.addEventListener('fetch', (event) => {
     @app.route("/passwort-vergessen", methods=["GET", "POST"])
     def forgot_password():
         if request.method == "POST":
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+            ip = get_client_ip()
             if not rate_limit_check(
                 "forgot_password",
                 ip or "unknown",
@@ -2790,6 +2800,9 @@ self.addEventListener('fetch', (event) => {
                 )
                 push_toast("Benachrichtigungen wurden gespeichert.", "success", "Benachrichtigungen")
                 return redirect(url_for("account_settings"))
+            if form_id.startswith("totp_") and not current_app.config.get("ENABLE_2FA"):
+                push_toast("2FA ist auf dieser Instanz deaktiviert.", "info", "2FA")
+                return redirect(url_for("account_settings"))
             if form_id == "totp_begin":
                 password = request.form.get("password", "")
                 if not verify_password(password, g.user["password_hash"]):
@@ -2898,6 +2911,15 @@ self.addEventListener('fetch', (event) => {
             return redirect(url_for("account_settings"))
 
         log_event("account_view", "account", "Konto-Einstellungen geöffnet", user_id=g.user["id"])
+        if not current_app.config.get("ENABLE_2FA"):
+            return render_template(
+                "account.html",
+                twofa_enabled=False,
+                totp_provisioning_uri="",
+                totp_qr_svg="",
+                totp_new_backup_codes=None,
+            )
+
         totp_secret = decrypt_secret(g.user["totp_secret_encrypted"])
         provisioning_uri = ""
         qr_svg = ""
@@ -2912,6 +2934,7 @@ self.addEventListener('fetch', (event) => {
         new_backup_codes = session.pop("totp_new_backup_codes", None)
         return render_template(
             "account.html",
+            twofa_enabled=True,
             totp_provisioning_uri=provisioning_uri,
             totp_qr_svg=qr_svg,
             totp_new_backup_codes=new_backup_codes,
@@ -3441,12 +3464,23 @@ self.addEventListener('fetch', (event) => {
         users = []
         grants = []
         if owned_profile:
-            users = g.db.execute(
-                """
-                SELECT id, display_name, email, is_admin, is_creator, is_reader, active
-                FROM users ORDER BY display_name COLLATE NOCASE
-                """
-            ).fetchall()
+            if g.user["is_admin"]:
+                users = g.db.execute(
+                    """
+                    SELECT id, display_name, email, is_admin, is_creator, is_reader, active
+                    FROM users ORDER BY display_name COLLATE NOCASE
+                    """
+                ).fetchall()
+            else:
+                # Creators only need a recipient list for grants; avoid exposing non-reader accounts.
+                users = g.db.execute(
+                    """
+                    SELECT id, display_name, email
+                    FROM users
+                    WHERE active = 1 AND is_reader = 1
+                    ORDER BY display_name COLLATE NOCASE
+                    """
+                ).fetchall()
             grants = g.db.execute(
                 """
                 SELECT grants.*, users.display_name AS grantee_name, users.email AS grantee_email
@@ -3477,7 +3511,7 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/verwaltung/benutzer/neu", methods=["POST"])
     @login_required
-    @creator_required
+    @admin_required
     def create_user():
         errors, data = validate_user_form(request.form)
         role = data["role"]
@@ -3510,13 +3544,11 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/verwaltung/benutzer/<int:user_id>/status", methods=["POST"])
     @login_required
-    @creator_required
+    @admin_required
     def toggle_user_status(user_id: int):
         user = g.db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if not user:
             abort(404)
-        if not g.user["is_admin"] and user["is_creator"]:
-            abort(403)
         new_status = 0 if user["active"] else 1
         g.db.execute(
             "UPDATE users SET active = ?, updated_at = ? WHERE id = ?",
@@ -3529,7 +3561,7 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/verwaltung/benutzer/<int:user_id>/loeschen", methods=["POST"])
     @login_required
-    @creator_required
+    @admin_required
     def delete_user(user_id: int):
         if user_id == g.user["id"]:
             push_toast("Sie können Ihr eigenes Konto hier nicht löschen.", "danger", "Benutzer nicht gelöscht")
@@ -3540,9 +3572,6 @@ self.addEventListener('fetch', (event) => {
         if user["is_admin"]:
             push_toast("Der Admin kann nicht gelöscht werden.", "danger", "Benutzer nicht gelöscht")
             return redirect(url_for("management"))
-        # Deleting creators deletes their entire profile; only admin may do that.
-        if user["is_creator"] and not g.user["is_admin"]:
-            abort(403)
 
         # Collect context for audit message before deletion.
         profile = g.db.execute("SELECT id, title FROM profiles WHERE owner_user_id = ?", (user_id,)).fetchone()
@@ -3728,26 +3757,17 @@ self.addEventListener('fetch', (event) => {
                 except ValueError:
                     max_mb = DEFAULT_PROFILE_STORAGE_MB
                 max_mb = max(10, min(max_mb, 1024))
-                backup_password = (request.form.get("backup_password") or "").strip()
-                backup_clear = bool(request.form.get("backup_password_clear"))
-                existing = (app_settings["backup_password_encrypted"] or "") if app_settings else ""
-                backup_encrypted = existing
-                if backup_clear:
-                    backup_encrypted = ""
-                elif backup_password:
-                    backup_encrypted = encrypt_secret(backup_password)
                 g.db.execute(
                     """
                     UPDATE app_settings
                     SET allow_registration = ?, require_email_verification = ?, max_profile_storage_mb = ?,
-                        backup_password_encrypted = ?, updated_by = ?, updated_at = ?
+                        updated_by = ?, updated_at = ?
                     WHERE id = 1
                     """,
                     (
                         allow_registration,
                         require_email_verification,
                         max_mb,
-                        backup_encrypted,
                         g.user["id"],
                         utcnow(),
                     ),
@@ -3841,24 +3861,17 @@ self.addEventListener('fetch', (event) => {
                 "app": "BackUpLife",
                 "created_at_utc": utcnow(),
                 "public_base_url": getattr(g, "public_base_url", None),
-                "encrypted": True,
+                "encrypted": False,
             }
             zf.writestr("backup.json", json.dumps(meta, ensure_ascii=False, indent=2))
 
         buffer.seek(0)
-        raw_bytes = buffer.getvalue()
-        backup_password = get_backup_password()
-        if backup_password:
-            cipher = Fernet(build_fernet_key(backup_password))
-        else:
-            cipher = get_cipher()
-        encrypted = cipher.encrypt(raw_bytes)
         log_event("backup_download", "admin", "Backup ZIP heruntergeladen")
         return send_file(
-            io.BytesIO(encrypted),
-            mimetype="application/octet-stream",
+            buffer,
+            mimetype="application/zip",
             as_attachment=True,
-            download_name=f"backuplife-backup-{now}.zip.enc",
+            download_name=f"backuplife-backup-{now}.zip",
         )
 
     @app.context_processor

@@ -331,30 +331,16 @@ def test_document_upload_quota_enforced(app, app_module, logged_in_creator, crea
     assert row and int(row["size_bytes"]) > 0
 
 
-def test_backup_download_encrypted(app, app_module, logged_in_admin):
-    # Set a known backup passphrase (encrypted at rest).
-    with app.test_request_context("/admin"):
-        from flask import g
-
-        g.db = app_module.get_db(app)
-        g.db.execute(
-            "UPDATE app_settings SET backup_password_encrypted = ? WHERE id = 1",
-            (app_module.encrypt_secret("backup-passphrase"),),
-        )
-        g.db.commit()
-        g.db.close()
-
+def test_backup_download_zip(app, logged_in_admin):
     resp = logged_in_admin.get("/admin/backup.zip")
     assert resp.status_code == 200
-    assert resp.headers.get("Content-Disposition", "").endswith(".zip.enc\"") or ".zip.enc" in resp.headers.get("Content-Disposition", "")
-
-    cipher = app_module.Fernet(app_module.build_fernet_key("backup-passphrase"))
-    decrypted = cipher.decrypt(resp.data)
-    assert decrypted[:2] == b"PK"  # ZIP magic
-    with zipfile.ZipFile(io.BytesIO(decrypted), "r") as zf:
+    assert resp.headers.get("Content-Disposition", "").endswith(".zip\"") or ".zip" in resp.headers.get("Content-Disposition", "")
+    assert resp.data[:2] == b"PK"  # ZIP magic
+    with zipfile.ZipFile(io.BytesIO(resp.data), "r") as zf:
         assert "backup.json" in zf.namelist()
         meta = json.loads(zf.read("backup.json").decode("utf-8"))
         assert meta.get("app") == "BackUpLife"
+        assert meta.get("encrypted") is False
 
 
 def test_login_requires_totp_when_enabled(app, app_module):

@@ -26,7 +26,7 @@ Wichtig: BackUpLife ersetzt kein Testament und ist keine rechtlich verbindliche 
   - CSRF‑Schutz für Formulare
   - Rate‑Limit und **gestaffelter Login‑Lockout** (5/10/15 Fehlversuche)
   - **TOTP‑2FA** (optional) und **Admin‑2FA Pflicht** (Default)
-- Admin‑Backup‑Download als **verschlüsseltes** Archiv (`.zip.enc`)
+- Admin‑Backup‑Download als Archiv (`.zip`)
 - Debug/Verifikation: `/version` zeigt Version/Build‑SHA/Build‑Datum (standardmäßig nur lokal erreichbar)
 
 ## Kategorien (Digitaler Nachlass)
@@ -92,9 +92,10 @@ Das Update überschreibt **nicht** `instance/` und startet den Service neu. Buil
 - `BACKUPLIFE_DB_PATH` (Fallback: `AETERNA_DB_PATH`)
 - `BACKUPLIFE_UPLOAD_DIR` (Fallback: `AETERNA_UPLOAD_DIR`)
 - `BACKUPLIFE_TRUST_PROXY=1` (Reverse‑Proxy Header vertrauen)
-- `BACKUPLIFE_COOKIE_SECURE=1` (Secure Cookies für HTTPS)
+- `BACKUPLIFE_COOKIE_SECURE=1` (Secure Cookies für HTTPS; für reines HTTP lokal `0`)
 - `BACKUPLIFE_SESSION_LIFETIME_MINUTES=120`
 - `BACKUPLIFE_ENFORCE_ADMIN_2FA=1`
+- `BACKUPLIFE_ENABLE_2FA=1` (2FA-Features aktivieren; für lokale Tests optional `0`)
 
 ## Tests
 
