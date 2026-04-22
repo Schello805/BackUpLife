@@ -47,10 +47,35 @@
 
     <div class="subtle-card p-4 mb-4">
       <div class="section-label mb-2">Sicherheit</div>
-      <h2 class="h4 mb-3">Registrierung, Verifikation und Limits</h2>
+      <h2 class="h4 mb-3">Registrierung & Zugriff absichern</h2>
       <form method="post" class="row g-3" novalidate>
         {{ csrf_input() }}
         <input type="hidden" name="form_id" value="security">
+        <div class="col-12">
+          <div class="subtle-card p-3 bg-white">
+            <div class="fw-semibold mb-1">Aktueller Status (wirksam)</div>
+            <ul class="hint-list ps-0 mb-0">
+              <li>
+                Registrierung:
+                {% if app_settings and app_settings['allow_registration'] %}
+                  {% if invite_active %}<strong>nur mit Einladungscode</strong>{% else %}<strong>öffentlich</strong>{% endif %}
+                {% else %}
+                  <strong>deaktiviert</strong>
+                {% endif %}
+              </li>
+              <li>E-Mail-Verifikation vor Login: <strong>{{ 'aktiv' if (not app_settings or app_settings['require_email_verification']) else 'inaktiv' }}</strong></li>
+              <li>Captcha: <strong>{{ 'aktiv' if (recaptcha_site_present and recaptcha_secret_present) else 'inaktiv' }}</strong></li>
+              <li>Admin-IP-Allowlist: <strong>{{ 'gesetzt' if (app_settings and app_settings['admin_ip_allowlist']) else 'leer' }}</strong></li>
+            </ul>
+            <div class="small text-secondary mt-2">Tipp: Wenn Sie „öffentlich“ zulassen möchten, kombinieren Sie <em>Invite-Code</em> + <em>E-Mail-Verifikation</em> + <em>Captcha</em>.</div>
+          </div>
+        </div>
+
+        <div class="col-12"><hr class="my-2"></div>
+
+        <div class="col-12">
+          <div class="section-label mb-2">Registrierung</div>
+        </div>
         <div class="col-12">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" name="allow_registration" id="allow_registration" {% if app_settings and app_settings['allow_registration'] %}checked{% endif %}>
@@ -58,40 +83,44 @@
           </div>
           <div class="form-text">Wenn deaktiviert, kann sich niemand neu registrieren. Bestehende Nutzer bleiben unberührt.</div>
         </div>
+        <div class="col-md-6">
+          <label class="form-label">Einladungscode (optional)</label>
+          <input class="form-control" name="registration_invite_code" type="password" placeholder="{% if invite_active %}******** (aktiv){% else %}leer lassen = kein Code{% endif %}">
+          <div class="form-text">Wenn ein Code aktiv ist, müssen Nutzer ihn bei der Registrierung eingeben. Das ist ein guter Spamschutz ohne Nutzer auszuschließen.</div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="registration_invite_clear" id="registration_invite_clear" {% if not invite_active %}disabled{% endif %}>
+            <label class="form-check-label" for="registration_invite_clear">Invite-Code deaktivieren (gespeicherten Code löschen)</label>
+          </div>
+          <div class="form-text">Leer lassen = unverändert. Einen neuen Code setzen Sie, indem Sie oben einen neuen Wert eintragen und speichern.</div>
+        </div>
+
+        <div class="col-12"><hr class="my-2"></div>
+        <div class="col-12">
+          <div class="section-label mb-2">E-Mail-Verifikation</div>
+        </div>
         <div class="col-12">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" name="require_email_verification" id="require_email_verification" {% if not app_settings or app_settings['require_email_verification'] %}checked{% endif %}>
             <label class="form-check-label" for="require_email_verification">E-Mail-Verifikation vor Login erzwingen</label>
           </div>
-          <div class="form-text">Empfohlen für öffentliche Instanzen. Erfordert SMTP-Konfiguration.</div>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Speicherlimit pro Nachlass (MB)</label>
-          <input class="form-control" name="max_profile_storage_mb" type="number" min="10" max="1024" value="{{ app_settings['max_profile_storage_mb'] if app_settings else 100 }}">
-          <div class="form-text">Gilt für Dokument-Uploads. Passwörter/Einträge liegen in der Datenbank und zählen nicht als Upload-Speicher.</div>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Einladungscode für Registrierung (optional)</label>
-          <input class="form-control" name="registration_invite_code" type="password" placeholder="leer lassen = unverändert">
-          <div class="form-text">Wenn gesetzt, ist die öffentliche Registrierung nur mit diesem Code möglich.</div>
-          <div class="form-check mt-2">
-            <input class="form-check-input" type="checkbox" name="registration_invite_clear" id="registration_invite_clear">
-            <label class="form-check-label" for="registration_invite_clear">Einladungscode entfernen</label>
-          </div>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Admin-IP-Allowlist (optional)</label>
-          <input class="form-control" name="admin_ip_allowlist" placeholder="z. B. 127.0.0.1/32,10.0.0.0/8" value="{{ app_settings['admin_ip_allowlist'] if app_settings else '' }}">
           <div class="form-text">
-            Wenn gesetzt, sind Admin-Endpunkte nur aus diesen IPs/Netzen erreichbar (für einzelne IP: <code>/32</code>).
-            Aktuell erkannt: <code>{{ current_ip }}</code>{% if current_ip_private %} (lokales Netz){% endif %}.
-            {% if current_ip_private %}Hinweis: Wenn Sie hier nur Ihre öffentliche Internet-IP erlauben möchten, rufen Sie den Adminbereich über die öffentliche URL auf, damit die öffentliche IP erkannt wird (oder erlauben zusätzlich Ihr LAN-Netz).{% endif %}
+            Empfohlen für öffentliche Instanzen.
+            {% if not smtp_configured %}
+              <strong class="text-danger">Achtung:</strong> SMTP ist noch nicht eingerichtet – Verifikation und Passwort-Reset können dann nicht funktionieren.
+            {% else %}
+              SMTP ist eingerichtet.
+            {% endif %}
           </div>
+        </div>
+
+        <div class="col-12"><hr class="my-2"></div>
+        <div class="col-12">
+          <div class="section-label mb-2">Bot-Schutz (Captcha)</div>
         </div>
         <div class="col-md-6">
           <label class="form-label">Google reCAPTCHA v3 Site Key (optional)</label>
           <input class="form-control" name="recaptcha_site_key" placeholder="leer lassen = unverändert" value="{{ app_settings['recaptcha_site_key'] if app_settings else '' }}">
-          <div class="form-text">Wenn gesetzt, wird reCAPTCHA v3 für Registrierung/Link erneut senden/Passwort-Reset verwendet.</div>
+          <div class="form-text">Wird zusammen mit dem Secret verwendet. Aktiv, sobald Site Key + Secret gespeichert sind.</div>
         </div>
         <div class="col-md-6">
           <label class="form-label">Google reCAPTCHA v3 Secret Key (optional)</label>
@@ -106,6 +135,51 @@
             <label class="form-check-label" for="recaptcha_secret_clear">Secret entfernen</label>
           </div>
         </div>
+
+        <div class="col-12"><hr class="my-2"></div>
+        <div class="col-12">
+          <div class="section-label mb-2">Adminzugriff (optional)</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Admin-IP-Allowlist</label>
+          <input class="form-control" name="admin_ip_allowlist" placeholder="z. B. 127.0.0.1/32,10.0.0.0/8" value="{{ app_settings['admin_ip_allowlist'] if app_settings else '' }}">
+          <div class="form-text">
+            Wenn gesetzt, sind Admin-Endpunkte nur aus diesen IPs/Netzen erreichbar (für einzelne IP: <code>/32</code>).
+            Aktuell erkannt: <code>{{ current_ip }}</code>{% if current_ip_private %} (lokales Netz){% endif %}.
+            {% if current_ip_private %}Hinweis: Wenn Sie hier nur Ihre öffentliche Internet-IP erlauben möchten, rufen Sie den Adminbereich über die öffentliche URL auf, damit die öffentliche IP erkannt wird (oder erlauben zusätzlich Ihr LAN-Netz).{% endif %}
+          </div>
+        </div>
+
+        <div class="col-12"><hr class="my-2"></div>
+        <div class="col-12">
+          <div class="section-label mb-2">Limits</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Speicherlimit pro Nachlass (MB)</label>
+          <input class="form-control" name="max_profile_storage_mb" type="number" min="10" max="1024" value="{{ app_settings['max_profile_storage_mb'] if app_settings else 100 }}">
+          <div class="form-text">Gilt für Dokument-Uploads. Passwörter/Einträge liegen in der Datenbank und zählen nicht als Upload-Speicher.</div>
+        </div>
+
+        <script>
+          (function () {
+            const allowReg = document.getElementById('allow_registration');
+            const inviteClear = document.getElementById('registration_invite_clear');
+            if (!allowReg || !inviteClear) return;
+            function sync() {
+              // Clearing the invite only makes sense when registration is enabled.
+              if (!allowReg.checked) {
+                inviteClear.checked = false;
+                inviteClear.disabled = true;
+                return;
+              }
+              // Keep disabled state if there is no stored invite code.
+              inviteClear.disabled = {{ 'false' if invite_active else 'true' }};
+            }
+            allowReg.addEventListener('change', sync);
+            sync();
+          })();
+        </script>
+
         <div class="col-12 d-flex justify-content-end">
           <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
         </div>

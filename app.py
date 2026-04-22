@@ -4383,6 +4383,10 @@ self.addEventListener('fetch', (event) => {
             current_ip_private = bool(ipaddress.ip_address(current_ip).is_private)
         except ValueError:
             current_ip_private = False
+        smtp_configured = is_smtp_configured(smtp_settings)
+        invite_active = bool((app_settings["registration_invite_hash"] or "").strip()) if app_settings else False
+        recaptcha_site_present = bool((app_settings["recaptcha_site_key"] or "").strip()) if app_settings else False
+        recaptcha_secret_present = bool((app_settings["recaptcha_secret_encrypted"] or "").strip()) if app_settings else False
         if request.method == "POST":
             form_id = (request.form.get("form_id") or "smtp").strip()
             if form_id == "system":
@@ -4408,6 +4412,15 @@ self.addEventListener('fetch', (event) => {
             if form_id == "security":
                 allow_registration = 1 if request.form.get("allow_registration") else 0
                 require_email_verification = 1 if request.form.get("require_email_verification") else 0
+                if require_email_verification:
+                    smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
+                    if not is_smtp_configured(smtp_settings):
+                        push_toast(
+                            "E-Mail-Verifikation kann nicht aktiviert werden, solange SMTP nicht eingerichtet ist.",
+                            "danger",
+                            "E-Mail-Verifikation",
+                        )
+                        return redirect(url_for("admin"))
                 try:
                     max_mb = int(request.form.get("max_profile_storage_mb", str(DEFAULT_PROFILE_STORAGE_MB)))
                 except ValueError:
@@ -4436,6 +4449,18 @@ self.addEventListener('fetch', (event) => {
                     recaptcha_secret_final = ""
                 elif recaptcha_secret:
                     recaptcha_secret_final = encrypt_secret(recaptcha_secret)
+                if recaptcha_site_final and not recaptcha_secret_final:
+                    push_toast(
+                        "reCAPTCHA Site Key ist gesetzt, aber es fehlt das Secret. Captcha bleibt dadurch inaktiv.",
+                        "warning",
+                        "Captcha",
+                    )
+                if recaptcha_secret_final and not recaptcha_site_final:
+                    push_toast(
+                        "reCAPTCHA Secret ist gesetzt, aber es fehlt der Site Key. Captcha bleibt dadurch inaktiv.",
+                        "warning",
+                        "Captcha",
+                    )
 
                 allowlist = parse_ip_allowlist(admin_ip_allowlist)
                 if allowlist and not ip_allowed(current_ip, allowlist):
@@ -4538,6 +4563,10 @@ self.addEventListener('fetch', (event) => {
             stats=stats,
             current_ip=current_ip,
             current_ip_private=current_ip_private,
+            smtp_configured=smtp_configured,
+            invite_active=invite_active,
+            recaptcha_site_present=recaptcha_site_present,
+            recaptcha_secret_present=recaptcha_secret_present,
         )
 
     @app.route("/admin/logs")
