@@ -1839,15 +1839,8 @@ def get_visible_profiles(user: sqlite3.Row) -> list[sqlite3.Row]:
 
 
 def get_relevant_logs(user: sqlite3.Row, owned_profile: sqlite3.Row | None = None) -> list[sqlite3.Row]:
-    if user["is_admin"]:
-        return g.db.execute(
-            """
-            SELECT activity_logs.*, profiles.slug
-            FROM activity_logs
-            LEFT JOIN profiles ON profiles.id = activity_logs.profile_id
-            ORDER BY activity_logs.id DESC LIMIT 150
-            """
-        ).fetchall()
+    # Note: even for admins, this function returns the *relevant* view (own profile + own actions).
+    # Global admin logs are available separately under /admin/logs.
     if owned_profile:
         return g.db.execute(
             """
@@ -1890,19 +1883,6 @@ def get_relevant_logs_window(
     limit = max(1, min(int(limit), 200))
     offset = max(0, int(offset))
     fetch_limit = limit + 1
-
-    if user["is_admin"]:
-        rows = g.db.execute(
-            """
-            SELECT activity_logs.*, profiles.slug
-            FROM activity_logs
-            LEFT JOIN profiles ON profiles.id = activity_logs.profile_id
-            ORDER BY activity_logs.id DESC
-            LIMIT ? OFFSET ?
-            """,
-            (fetch_limit, offset),
-        ).fetchall()
-        return rows[:limit], len(rows) > limit
 
     if owned_profile:
         rows = g.db.execute(
