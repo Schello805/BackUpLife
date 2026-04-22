@@ -12,6 +12,7 @@ import re
 import secrets
 import sqlite3
 import struct
+import sys
 import textwrap
 import time
 import uuid
@@ -642,6 +643,11 @@ def verify_recaptcha_v3(response_token: str, ip: str, action: str) -> bool:
         )
         with urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
+        if env_flag("BACKUPLIFE_RECAPTCHA_DEBUG"):
+            print(
+                f"[recaptcha] success={data.get('success')} action={data.get('action')} hostname={data.get('hostname')} score={data.get('score')} errors={data.get('error-codes')}",
+                file=sys.stderr,
+            )
         if not data.get("success"):
             return False
         if (data.get("action") or "") != (action or ""):
