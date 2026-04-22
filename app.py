@@ -3999,6 +3999,11 @@ self.addEventListener('fetch', (event) => {
     def admin():
         smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
         app_settings = g.db.execute("SELECT * FROM app_settings WHERE id = 1").fetchone()
+        current_ip = get_client_ip()
+        try:
+            current_ip_private = bool(ipaddress.ip_address(current_ip).is_private)
+        except ValueError:
+            current_ip_private = False
         if request.method == "POST":
             form_id = (request.form.get("form_id") or "smtp").strip()
             if form_id == "system":
@@ -4030,7 +4035,6 @@ self.addEventListener('fetch', (event) => {
                     max_mb = DEFAULT_PROFILE_STORAGE_MB
                 max_mb = max(10, min(max_mb, 1024))
                 admin_ip_allowlist = (request.form.get("admin_ip_allowlist") or "").strip()
-                admin_ip_allowlist_force = bool(request.form.get("admin_ip_allowlist_force"))
                 invite_code = (request.form.get("registration_invite_code") or "").strip()
                 invite_clear = bool(request.form.get("registration_invite_clear"))
                 existing = (app_settings["registration_invite_hash"] or "") if app_settings else ""
@@ -4055,19 +4059,14 @@ self.addEventListener('fetch', (event) => {
                     recaptcha_secret_final = encrypt_secret(recaptcha_secret)
 
                 allowlist = parse_ip_allowlist(admin_ip_allowlist)
-                if allowlist and not ip_allowed(get_client_ip(), allowlist) and not admin_ip_allowlist_force:
+                if allowlist and not ip_allowed(current_ip, allowlist):
                     push_toast(
-                        "Diese IP-Allowlist würde Sie aussperren. Bitte fügen Sie Ihre aktuelle IP hinzu oder lassen Sie das Feld leer.",
+                        f"Diese IP-Allowlist enthält Ihre aktuell erkannte IP ({current_ip}) nicht und würde Sie aussperren. "
+                        "Bitte fügen Sie diese IP (z. B. als /32) hinzu oder lassen Sie das Feld leer.",
                         "danger",
                         "Admin-IP-Allowlist",
                     )
                     return redirect(url_for("admin"))
-                if allowlist and not ip_allowed(get_client_ip(), allowlist) and admin_ip_allowlist_force:
-                    push_toast(
-                        "Warnung: Die IP-Allowlist greift sofort. Sie können sich damit aussperren, wenn Sie nicht aus einer erlaubten IP zugreifen.",
-                        "warning",
-                        "Admin-IP-Allowlist",
-                    )
                 g.db.execute(
                     """
                     UPDATE app_settings
@@ -4158,7 +4157,8 @@ self.addEventListener('fetch', (event) => {
             smtp_settings=smtp_settings,
             app_settings=app_settings,
             stats=stats,
-            current_ip=get_client_ip(),
+            current_ip=current_ip,
+            current_ip_private=current_ip_private,
         )
 
     @app.route("/admin/backup.zip")
