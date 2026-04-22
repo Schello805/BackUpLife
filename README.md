@@ -109,6 +109,16 @@ pytest
 
 Die Test‑Suite nutzt eine temporäre DB und hinterlässt keine Testdaten.
 
+## Betrieb: Monitoring & Schutz
+
+- Empfehlung: BackUpLife nur über Reverse Proxy (HTTPS) betreiben und den App-Port nicht öffentlich exponieren (Firewall/Sicherheitsgruppe).
+- Für Login/Registrierung/Reset zusätzlich zu Captcha empfiehlt sich serverseitiges Rate-Limiting (z. B. `limit_req` in Nginx) und Fail2ban.
+- BackUpLife protokolliert sicherheitsrelevante Aktionen im Audit-Log (u. a. Login-Fehler, Passwort-Reset, Dokument-Downloads). Für eine schnelle Lageübersicht:
+
+```bash
+sqlite3 /opt/backuplife/instance/backuplife.db "SELECT created_at,actor_name,event_type,detail,request_path,ip_address FROM activity_logs ORDER BY id DESC LIMIT 200;"
+```
+
 ## Lizenz
 
 Dieses Projekt steht unter der **PolyForm Noncommercial License** (nicht‑kommerziell). Siehe [LICENSE](./LICENSE).

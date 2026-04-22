@@ -69,6 +69,9 @@ DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
 DEFAULT_RATE_LIMIT_LOGIN = 20
 DEFAULT_RATE_LIMIT_REGISTER = 10
 DEFAULT_RATE_LIMIT_FORGOT = 10
+DEFAULT_RATE_LIMIT_EMAIL_DAILY = 5
+DEFAULT_RATE_LIMIT_EMAIL_WINDOW_SECONDS = 24 * 60 * 60
+DEFAULT_RATE_LIMIT_EMAIL_COOLDOWN_SECONDS = 60
 DEFAULT_SESSION_LIFETIME_MINUTES = 120
 DEFAULT_RECAPTCHA_MIN_SCORE = 0.5
 
@@ -782,7 +785,14 @@ def rate_limit_check(action: str, key: str, limit: int, window_seconds: int) -> 
             (action, key, window, utcnow()),
         )
         g.db.commit()
+    return True
+
+
+def rate_limit_email(action: str, email: str, limit: int, window_seconds: int) -> bool:
+    normalized = normalize_email(email or "")
+    if not normalized:
         return True
+    return rate_limit_check(action, f"email:{normalized}", limit, window_seconds)
     count = int(row["count"] or 0) + 1
     g.db.execute(
         "UPDATE rate_limits SET count = ?, updated_at = ? WHERE action = ? AND key = ?",
@@ -2816,6 +2826,24 @@ self.addEventListener('fetch', (event) => {
                     recaptcha_site_key=recaptcha_site_key,
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 ), 429
+            if not rate_limit_email(
+                "resend_verification_email",
+                email,
+                DEFAULT_RATE_LIMIT_EMAIL_DAILY,
+                DEFAULT_RATE_LIMIT_EMAIL_WINDOW_SECONDS,
+            ) or not rate_limit_email(
+                "resend_verification_cooldown",
+                email,
+                1,
+                DEFAULT_RATE_LIMIT_EMAIL_COOLDOWN_SECONDS,
+            ):
+                push_toast("Bitte warten Sie kurz, bevor Sie es erneut versuchen.", "danger", "Zu viele Versuche")
+                return render_template(
+                    "resend_verification.html",
+                    email=email,
+                    recaptcha_site_key=recaptcha_site_key,
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                ), 429
             user = g.db.execute("SELECT * FROM users WHERE lower(email) = ? AND active = 1", (email,)).fetchone()
             if not user:
                 push_toast("Wenn diese E-Mail existiert, wurde ein Link versendet.", "success", "Wenn vorhanden")
@@ -2885,6 +2913,23 @@ self.addEventListener('fetch', (event) => {
                     turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
                 ), 429
             email = normalize_email(request.form.get("email", ""))
+            if not rate_limit_email(
+                "forgot_password_email",
+                email,
+                DEFAULT_RATE_LIMIT_EMAIL_DAILY,
+                DEFAULT_RATE_LIMIT_EMAIL_WINDOW_SECONDS,
+            ) or not rate_limit_email(
+                "forgot_password_cooldown",
+                email,
+                1,
+                DEFAULT_RATE_LIMIT_EMAIL_COOLDOWN_SECONDS,
+            ):
+                push_toast("Bitte warten Sie kurz, bevor Sie es erneut versuchen.", "danger", "Zu viele Versuche")
+                return render_template(
+                    "forgot_password.html",
+                    recaptcha_site_key=recaptcha_site_key,
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                ), 429
             user = g.db.execute("SELECT * FROM users WHERE lower(email) = ?", (email,)).fetchone()
             smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
             if user:
