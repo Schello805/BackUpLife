@@ -82,7 +82,11 @@
         <div class="col-md-6">
           <label class="form-label">Admin-IP-Allowlist (optional)</label>
           <input class="form-control" name="admin_ip_allowlist" placeholder="z. B. 127.0.0.1/32,10.0.0.0/8" value="{{ app_settings['admin_ip_allowlist'] if app_settings else '' }}">
-          <div class="form-text">Wenn gesetzt, sind Admin-Endpunkte nur aus diesen IPs/Netzen erreichbar.</div>
+          <div class="form-text">Wenn gesetzt, sind Admin-Endpunkte nur aus diesen IPs/Netzen erreichbar (für einzelne IP: <code>/32</code>). Aktuell erkannt: <code>{{ current_ip }}</code></div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="admin_ip_allowlist_force" id="admin_ip_allowlist_force">
+            <label class="form-check-label" for="admin_ip_allowlist_force">Trotz möglicher Aussperrung speichern</label>
+          </div>
         </div>
         <div class="col-md-6">
           <label class="form-label">Google reCAPTCHA v3 Site Key (optional)</label>
@@ -91,7 +95,12 @@
         </div>
         <div class="col-md-6">
           <label class="form-label">Google reCAPTCHA v3 Secret Key (optional)</label>
-          <input class="form-control" name="recaptcha_secret_key" type="password" placeholder="leer lassen = unverändert">
+          <input
+            class="form-control"
+            name="recaptcha_secret_key"
+            type="password"
+            placeholder="{% if app_settings and app_settings['recaptcha_secret_encrypted'] %}******** (gespeichert){% else %}leer lassen = unverändert{% endif %}"
+          >
           <div class="form-check mt-2">
             <input class="form-check-input" type="checkbox" name="recaptcha_secret_clear" id="recaptcha_secret_clear">
             <label class="form-check-label" for="recaptcha_secret_clear">Secret entfernen</label>

@@ -4030,6 +4030,7 @@ self.addEventListener('fetch', (event) => {
                     max_mb = DEFAULT_PROFILE_STORAGE_MB
                 max_mb = max(10, min(max_mb, 1024))
                 admin_ip_allowlist = (request.form.get("admin_ip_allowlist") or "").strip()
+                admin_ip_allowlist_force = bool(request.form.get("admin_ip_allowlist_force"))
                 invite_code = (request.form.get("registration_invite_code") or "").strip()
                 invite_clear = bool(request.form.get("registration_invite_clear"))
                 existing = (app_settings["registration_invite_hash"] or "") if app_settings else ""
@@ -4054,13 +4055,19 @@ self.addEventListener('fetch', (event) => {
                     recaptcha_secret_final = encrypt_secret(recaptcha_secret)
 
                 allowlist = parse_ip_allowlist(admin_ip_allowlist)
-                if allowlist and not ip_allowed(get_client_ip(), allowlist):
+                if allowlist and not ip_allowed(get_client_ip(), allowlist) and not admin_ip_allowlist_force:
                     push_toast(
                         "Diese IP-Allowlist würde Sie aussperren. Bitte fügen Sie Ihre aktuelle IP hinzu oder lassen Sie das Feld leer.",
                         "danger",
                         "Admin-IP-Allowlist",
                     )
                     return redirect(url_for("admin"))
+                if allowlist and not ip_allowed(get_client_ip(), allowlist) and admin_ip_allowlist_force:
+                    push_toast(
+                        "Warnung: Die IP-Allowlist greift sofort. Sie können sich damit aussperren, wenn Sie nicht aus einer erlaubten IP zugreifen.",
+                        "warning",
+                        "Admin-IP-Allowlist",
+                    )
                 g.db.execute(
                     """
                     UPDATE app_settings
@@ -4146,7 +4153,13 @@ self.addEventListener('fetch', (event) => {
             "records": g.db.execute("SELECT COUNT(*) AS count FROM records").fetchone()["count"],
             "documents": g.db.execute("SELECT COUNT(*) AS count FROM documents").fetchone()["count"],
         }
-        return render_template("admin.html", smtp_settings=smtp_settings, app_settings=app_settings, stats=stats)
+        return render_template(
+            "admin.html",
+            smtp_settings=smtp_settings,
+            app_settings=app_settings,
+            stats=stats,
+            current_ip=get_client_ip(),
+        )
 
     @app.route("/admin/backup.zip")
     @login_required
