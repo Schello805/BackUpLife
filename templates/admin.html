@@ -70,6 +70,15 @@
           <input class="form-control" name="max_profile_storage_mb" type="number" min="10" max="1024" value="{{ app_settings['max_profile_storage_mb'] if app_settings else 100 }}">
           <div class="form-text">Gilt für Dokument-Uploads. Passwörter/Einträge liegen in der Datenbank und zählen nicht als Upload-Speicher.</div>
         </div>
+        <div class="col-md-6">
+          <label class="form-label">Einladungscode für Registrierung (optional)</label>
+          <input class="form-control" name="registration_invite_code" type="password" placeholder="leer lassen = unverändert">
+          <div class="form-text">Wenn gesetzt, ist die öffentliche Registrierung nur mit diesem Code möglich.</div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="registration_invite_clear" id="registration_invite_clear">
+            <label class="form-check-label" for="registration_invite_clear">Einladungscode entfernen</label>
+          </div>
+        </div>
         <div class="col-12 d-flex justify-content-end">
           <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
         </div>

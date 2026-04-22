@@ -68,6 +68,7 @@ def test_registration_requires_smtp_when_verification_enabled(app, app_module, c
             "admin",
             None,
         )
+        g.db.execute("UPDATE app_settings SET allow_registration = 1 WHERE id = 1")
         g.db.commit()
         g.db.close()
 
@@ -80,12 +81,11 @@ def test_registration_requires_smtp_when_verification_enabled(app, app_module, c
             "csrf_token": csrf,
             "display_name": "Max",
             "email": "max@example.com",
-            "role": "creator",
+            "role": "reader",
             "password": "very-secure-password",
             "accept_terms": "1",
         },
         follow_redirects=True,
-        headers={"X-Forwarded-For": "203.0.113.55"},
     )
     assert resp.status_code == 200
     assert b"SMTP" in resp.data
@@ -105,6 +105,7 @@ def test_email_verification_flow(app, app_module, monkeypatch):
             "admin",
             None,
         )
+        g.db.execute("UPDATE app_settings SET allow_registration = 1 WHERE id = 1")
         g.db.execute(
             "UPDATE smtp_settings SET host = 'smtp.example', sender_email = 'noreply@example.com' WHERE id = 1"
         )
@@ -127,11 +128,10 @@ def test_email_verification_flow(app, app_module, monkeypatch):
             "csrf_token": csrf,
             "display_name": "Erika",
             "email": "erika@example.com",
-            "role": "creator",
+            "role": "reader",
             "password": "very-secure-password",
             "accept_terms": "1",
         },
-        headers={"X-Forwarded-For": "203.0.113.56"},
         follow_redirects=False,
     )
     assert resp.status_code in (302, 303)

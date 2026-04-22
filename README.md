@@ -93,6 +93,9 @@ Das Update überschreibt **nicht** `instance/` und startet den Service neu. Buil
 - `BACKUPLIFE_UPLOAD_DIR` (Fallback: `AETERNA_UPLOAD_DIR`)
 - `BACKUPLIFE_TRUST_PROXY=1` (Reverse‑Proxy Header vertrauen)
 - `BACKUPLIFE_COOKIE_SECURE=1` (Secure Cookies für HTTPS; für reines HTTP lokal `0`)
+- `BACKUPLIFE_ADMIN_IP_ALLOWLIST=...` (optional, z. B. `127.0.0.1/32,10.0.0.0/8` – gilt für Admin-Endpunkte)
+- `BACKUPLIFE_TURNSTILE_SITE_KEY=...` (optional Captcha)
+- `BACKUPLIFE_TURNSTILE_SECRET_KEY=...` (optional Captcha)
 - `BACKUPLIFE_SESSION_LIFETIME_MINUTES=120`
 - `BACKUPLIFE_ENFORCE_ADMIN_2FA=1`
 - `BACKUPLIFE_ENABLE_2FA=1` (2FA-Features aktivieren; für lokale Tests optional `0`)

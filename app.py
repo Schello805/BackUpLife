@@ -5,6 +5,7 @@ import html
 import io
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -18,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -567,6 +568,57 @@ def env_flag(name: str, default: str = "0") -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
+def hash_invite_code(value: str) -> str:
+    return hashlib.sha256((value or "").strip().encode("utf-8")).hexdigest()
+
+
+def parse_ip_allowlist(raw: str) -> list[ipaddress._BaseNetwork]:
+    items = [part.strip() for part in (raw or "").split(",") if part.strip()]
+    networks: list[ipaddress._BaseNetwork] = []
+    for item in items:
+        try:
+            if "/" in item:
+                networks.append(ipaddress.ip_network(item, strict=False))
+            else:
+                ip = ipaddress.ip_address(item)
+                networks.append(ipaddress.ip_network(f"{ip}/{ip.max_prefixlen}", strict=False))
+        except ValueError:
+            continue
+    return networks
+
+
+def ip_allowed(ip: str, allowlist: list[ipaddress._BaseNetwork]) -> bool:
+    if not allowlist:
+        return True
+    try:
+        addr = ipaddress.ip_address((ip or "").strip())
+    except ValueError:
+        return False
+    return any(addr in net for net in allowlist)
+
+
+def verify_turnstile(response_token: str, ip: str) -> bool:
+    secret = (os.environ.get("BACKUPLIFE_TURNSTILE_SECRET_KEY") or "").strip()
+    if not secret:
+        return True
+    token = (response_token or "").strip()
+    if not token:
+        return False
+    payload = urlencode({"secret": secret, "response": token, "remoteip": (ip or "").strip()}).encode("utf-8")
+    try:
+        req = Request(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return bool(data.get("success"))
+    except Exception:
+        return False
+
+
 def is_smtp_configured(row: sqlite3.Row | None) -> bool:
     if not row:
         return False
@@ -583,6 +635,14 @@ def get_allow_registration() -> bool:
         return bool(int(row["allow_registration"]))  # type: ignore[index]
     except Exception:
         return bool(DEFAULT_ALLOW_REGISTRATION)
+
+
+def get_registration_invite_hash() -> str:
+    try:
+        row = get_app_settings_row()
+        return (row["registration_invite_hash"] or "").strip()
+    except Exception:
+        return ""
 
 
 def get_require_email_verification() -> bool:
@@ -761,6 +821,8 @@ def create_app() -> Flask:
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = env_flag("BACKUPLIFE_COOKIE_SECURE") or env_flag("AETERNA_COOKIE_SECURE")
     app.config["ENABLE_2FA"] = env_flag("BACKUPLIFE_ENABLE_2FA", "1")
+    app.config["TURNSTILE_SITE_KEY"] = (os.environ.get("BACKUPLIFE_TURNSTILE_SITE_KEY") or "").strip()
+    app.config["ADMIN_IP_ALLOWLIST"] = parse_ip_allowlist(os.environ.get("BACKUPLIFE_ADMIN_IP_ALLOWLIST", ""))
     # Honor reverse-proxy headers for scheme/host/ip when explicitly enabled.
     if os.environ.get("BACKUPLIFE_TRUST_PROXY") == "1":
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
@@ -997,6 +1059,7 @@ def init_db(app: Flask) -> None:
         allow_registration INTEGER NOT NULL DEFAULT 0,
         require_email_verification INTEGER NOT NULL DEFAULT 1,
         max_profile_storage_mb INTEGER NOT NULL DEFAULT 100,
+        registration_invite_hash TEXT NOT NULL DEFAULT '',
         backup_password_encrypted TEXT NOT NULL DEFAULT '',
         updated_by INTEGER,
         updated_at TEXT NOT NULL DEFAULT ''
@@ -1129,6 +1192,8 @@ def init_db(app: Flask) -> None:
         db.execute("ALTER TABLE app_settings ADD COLUMN require_email_verification INTEGER NOT NULL DEFAULT 1")
     if "max_profile_storage_mb" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN max_profile_storage_mb INTEGER NOT NULL DEFAULT 100")
+    if "registration_invite_hash" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN registration_invite_hash TEXT NOT NULL DEFAULT ''")
     if "backup_password_encrypted" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN backup_password_encrypted TEXT NOT NULL DEFAULT ''")
 
@@ -1505,6 +1570,9 @@ def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not g.user or not g.user["is_admin"]:
+            abort(403)
+        allowlist = current_app.config.get("ADMIN_IP_ALLOWLIST") or []
+        if allowlist and not ip_allowed(get_client_ip(), allowlist):
             abort(403)
         return view(*args, **kwargs)
 
@@ -2460,9 +2528,24 @@ self.addEventListener('fetch', (event) => {
             return redirect(url_for("dashboard"))
         if not get_allow_registration():
             push_toast("Die Registrierung ist aktuell deaktiviert.", "danger", "Registrierung nicht möglich")
-            return render_template("register.html", form_values=None), 403
+            return render_template(
+                "register.html",
+                form_values=None,
+                invite_required=bool(get_registration_invite_hash()),
+                turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+            ), 403
         if request.method == "POST":
             ip = get_client_ip()
+            if current_app.config.get("TURNSTILE_SITE_KEY"):
+                token = request.form.get("cf-turnstile-response", "")
+                if not verify_turnstile(token, ip):
+                    push_toast("Bitte bestätigen Sie das Captcha und versuchen Sie es erneut.", "danger", "Captcha fehlgeschlagen")
+                    return render_template(
+                        "register.html",
+                        form_values=None,
+                        invite_required=bool(get_registration_invite_hash()),
+                        turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                    ), 400
             if not rate_limit_check(
                 "register",
                 ip or "unknown",
@@ -2474,16 +2557,31 @@ self.addEventListener('fetch', (event) => {
                     "danger",
                     "Bitte kurz warten",
                 )
-                return render_template("register.html", form_values=None), 429
+                return render_template(
+                    "register.html",
+                    form_values=None,
+                    invite_required=bool(get_registration_invite_hash()),
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                ), 429
             errors, data = validate_user_form(request.form)
             if not request.form.get("accept_terms"):
                 errors = list(errors) + ["Bitte bestätigen Sie die Nutzungsbedingungen."]
             data["accept_terms"] = "1" if request.form.get("accept_terms") else ""
             role = "reader"
+            invite_hash = get_registration_invite_hash()
+            if invite_hash:
+                invite = (request.form.get("invite_code") or "").strip()
+                if not invite or hash_invite_code(invite) != invite_hash:
+                    errors = list(errors) + ["Der Einladungscode ist ungültig."]
             if errors:
                 for error in errors:
                     push_toast(error, "danger", "Registrierung fehlgeschlagen")
-                return render_template("register.html", form_values=data)
+                return render_template(
+                    "register.html",
+                    form_values=data,
+                    invite_required=bool(invite_hash),
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                )
             require_verification = get_require_email_verification()
             smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
             if require_verification and not is_smtp_configured(smtp_settings):
@@ -2492,7 +2590,12 @@ self.addEventListener('fetch', (event) => {
                     "danger",
                     "SMTP fehlt",
                 )
-                return render_template("register.html", form_values=data)
+                return render_template(
+                    "register.html",
+                    form_values=data,
+                    invite_required=bool(invite_hash),
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                )
             try:
                 user_id = create_user_with_profile(
                     data["display_name"],
@@ -2513,7 +2616,12 @@ self.addEventListener('fetch', (event) => {
                         g.db.execute("DELETE FROM users WHERE id = ?", (user_id,))
                         g.db.commit()
                         push_toast(msg, "danger", "Registrierung fehlgeschlagen")
-                        return render_template("register.html", form_values=data)
+                        return render_template(
+                            "register.html",
+                            form_values=data,
+                            invite_required=bool(invite_hash),
+                            turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                        )
                 push_toast(
                     "Ihr Konto wurde angelegt. Bitte prüfen Sie Ihr Postfach und bestätigen Sie Ihre E-Mail-Adresse.",
                     "success",
@@ -2522,8 +2630,18 @@ self.addEventListener('fetch', (event) => {
                 return redirect(url_for("login"))
             except sqlite3.IntegrityError:
                 push_toast("Diese E-Mail-Adresse ist bereits vergeben.", "danger", "Registrierung fehlgeschlagen")
-                return render_template("register.html", form_values=data)
-        return render_template("register.html", form_values=None)
+                return render_template(
+                    "register.html",
+                    form_values=data,
+                    invite_required=bool(invite_hash),
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                )
+        return render_template(
+            "register.html",
+            form_values=None,
+            invite_required=bool(get_registration_invite_hash()),
+            turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+        )
 
     @app.route("/email-bestaetigen/<token>")
     def verify_email(token: str):
@@ -2567,6 +2685,15 @@ self.addEventListener('fetch', (event) => {
         if request.method == "POST":
             email = normalize_email(request.form.get("email", ""))
             ip = get_client_ip()
+            if current_app.config.get("TURNSTILE_SITE_KEY"):
+                token = request.form.get("cf-turnstile-response", "")
+                if not verify_turnstile(token, ip):
+                    push_toast("Bitte bestätigen Sie das Captcha und versuchen Sie es erneut.", "danger", "Captcha fehlgeschlagen")
+                    return render_template(
+                        "resend_verification.html",
+                        email=email,
+                        turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                    ), 400
             if not rate_limit_check(
                 "resend_verification",
                 ip or "unknown",
@@ -2574,7 +2701,11 @@ self.addEventListener('fetch', (event) => {
                 DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
             ):
                 push_toast("Bitte warten Sie kurz, bevor Sie es erneut versuchen.", "danger", "Zu viele Versuche")
-                return render_template("resend_verification.html", email=email), 429
+                return render_template(
+                    "resend_verification.html",
+                    email=email,
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                ), 429
             user = g.db.execute("SELECT * FROM users WHERE lower(email) = ? AND active = 1", (email,)).fetchone()
             if not user:
                 push_toast("Wenn diese E-Mail existiert, wurde ein Link versendet.", "success", "Wenn vorhanden")
@@ -2586,9 +2717,17 @@ self.addEventListener('fetch', (event) => {
             push_toast(msg, "success" if ok else "danger", "E-Mail-Bestätigung")
             if ok:
                 return redirect(url_for("login"))
-            return render_template("resend_verification.html", email=email)
+            return render_template(
+                "resend_verification.html",
+                email=email,
+                turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+            )
         email = request.args.get("email", "")
-        return render_template("resend_verification.html", email=email)
+        return render_template(
+            "resend_verification.html",
+            email=email,
+            turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+        )
 
     @app.route("/logout")
     @login_required
@@ -2602,6 +2741,14 @@ self.addEventListener('fetch', (event) => {
     def forgot_password():
         if request.method == "POST":
             ip = get_client_ip()
+            if current_app.config.get("TURNSTILE_SITE_KEY"):
+                token = request.form.get("cf-turnstile-response", "")
+                if not verify_turnstile(token, ip):
+                    push_toast("Bitte bestätigen Sie das Captcha und versuchen Sie es erneut.", "danger", "Captcha fehlgeschlagen")
+                    return render_template(
+                        "forgot_password.html",
+                        turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                    ), 400
             if not rate_limit_check(
                 "forgot_password",
                 ip or "unknown",
@@ -2609,7 +2756,10 @@ self.addEventListener('fetch', (event) => {
                 DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
             ):
                 push_toast("Bitte warten Sie kurz, bevor Sie es erneut versuchen.", "danger", "Zu viele Versuche")
-                return render_template("forgot_password.html"), 429
+                return render_template(
+                    "forgot_password.html",
+                    turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+                ), 429
             email = normalize_email(request.form.get("email", ""))
             user = g.db.execute("SELECT * FROM users WHERE lower(email) = ?", (email,)).fetchone()
             smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
@@ -2647,7 +2797,10 @@ self.addEventListener('fetch', (event) => {
                 log_event("password_reset_request", "auth", f"Reset angefordert für {email}")
             push_toast("Falls die E-Mail existiert, wurde ein Link versendet.", "info", "Passwort-Reset")
             return redirect(url_for("login"))
-        return render_template("forgot_password.html")
+        return render_template(
+            "forgot_password.html",
+            turnstile_site_key=current_app.config.get("TURNSTILE_SITE_KEY", ""),
+        )
 
     @app.route("/passwort-zuruecksetzen/<token>", methods=["GET", "POST"])
     def reset_password(token: str):
@@ -3757,17 +3910,26 @@ self.addEventListener('fetch', (event) => {
                 except ValueError:
                     max_mb = DEFAULT_PROFILE_STORAGE_MB
                 max_mb = max(10, min(max_mb, 1024))
+                invite_code = (request.form.get("registration_invite_code") or "").strip()
+                invite_clear = bool(request.form.get("registration_invite_clear"))
+                existing = (app_settings["registration_invite_hash"] or "") if app_settings else ""
+                invite_hash = existing
+                if invite_clear:
+                    invite_hash = ""
+                elif invite_code:
+                    invite_hash = hash_invite_code(invite_code)
                 g.db.execute(
                     """
                     UPDATE app_settings
                     SET allow_registration = ?, require_email_verification = ?, max_profile_storage_mb = ?,
-                        updated_by = ?, updated_at = ?
+                        registration_invite_hash = ?, updated_by = ?, updated_at = ?
                     WHERE id = 1
                     """,
                     (
                         allow_registration,
                         require_email_verification,
                         max_mb,
+                        invite_hash,
                         g.user["id"],
                         utcnow(),
                     ),

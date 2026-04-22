@@ -38,6 +38,13 @@
             <div>
               <input type="hidden" name="role" value="reader">
             </div>
+            {% if invite_required %}
+              <div>
+                <label class="form-label">Einladungscode</label>
+                <input class="form-control" name="invite_code" value="{{ values.get('invite_code', '') }}" required>
+                <div class="form-text">Diese Instanz erlaubt die Registrierung nur mit Einladungscode.</div>
+              </div>
+            {% endif %}
             <div>
               <label class="form-label">Passwort</label>
               <input type="password" class="form-control" name="password" minlength="10" required>
@@ -48,6 +55,10 @@
                 Ich habe die <a href="{{ url_for('terms_page') }}" target="_blank" rel="noreferrer">Nutzungsbedingungen</a> gelesen und akzeptiere sie.
               </label>
             </div>
+            {% if turnstile_site_key %}
+              <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+              <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+            {% endif %}
             <button class="btn btn-primary">Registrieren</button>
           </form>
           <div class="mt-4 small">
