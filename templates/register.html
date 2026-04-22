@@ -14,9 +14,8 @@
             </div>
           </div>
           <ul class="hint-list ps-0 mb-0">
-            <li><strong>Registrierung:</strong> erstellt ein <strong>Leser</strong>-Konto (für freigegebene Inhalte)</li>
-            <li><strong>Ersteller</strong>-Konten werden aus Sicherheitsgründen nur vom Admin angelegt</li>
-            <li><strong>Admin</strong> ist ausschließlich das erste Konto (Einrichtung) und verwaltet System-Einstellungen</li>
+            <li><strong>Registrierung:</strong> erstellt ein <strong>Ersteller</strong>-Konto (Ihr eigener Nachlass)</li>
+            <li><strong>Leser</strong>-Konten werden anschließend als Einladung angelegt und erhalten nur explizit freigegebene Inhalte</li>
           </ul>
         </div>
       </div>
@@ -36,7 +35,7 @@
               <input type="email" class="form-control" name="email" value="{{ values.get('email', '') }}" required>
             </div>
             <div>
-              <input type="hidden" name="role" value="reader">
+              <input type="hidden" name="role" value="creator">
             </div>
             {% if invite_required %}
               <div>

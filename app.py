@@ -2659,7 +2659,7 @@ self.addEventListener('fetch', (event) => {
             if not request.form.get("accept_terms"):
                 errors = list(errors) + ["Bitte bestätigen Sie die Nutzungsbedingungen."]
             data["accept_terms"] = "1" if request.form.get("accept_terms") else ""
-            role = "reader"
+            role = "creator"
             invite_hash = get_registration_invite_hash()
             if invite_hash:
                 invite = (request.form.get("invite_code") or "").strip()
@@ -3789,15 +3789,14 @@ self.addEventListener('fetch', (event) => {
 
     @app.route("/verwaltung/benutzer/neu", methods=["POST"])
     @login_required
-    @admin_required
+    @creator_required
     def create_user():
-        errors, data = validate_user_form(request.form)
-        role = data["role"]
-        if role == "admin":
-            errors = list(errors) + ["Admin kann nicht angelegt werden. Es gibt genau einen Admin (der erste Benutzer)."]
-            role = "creator"
-        if role == "creator" and not g.user["is_admin"]:
+        owned_profile = get_profile_for_owner(g.user["id"])
+        if not owned_profile:
             abort(403)
+        errors, data = validate_user_form(request.form)
+        # Users created from /verwaltung are always "Leser" accounts.
+        role = "reader"
         if errors:
             for error in errors:
                 push_toast(error, "danger", "Benutzer nicht erstellt")
@@ -3810,12 +3809,23 @@ self.addEventListener('fetch', (event) => {
                 role,
                 g.user["id"],
             )
+            # Default: grant full access to this creator's profile (can be narrowed later).
+            try:
+                g.db.execute(
+                    """
+                    INSERT INTO grants (profile_id, grantee_user_id, category_key, can_export, created_by, created_at)
+                    VALUES (?, ?, NULL, 1, ?, ?)
+                    """,
+                    (owned_profile["id"], user_id, g.user["id"], utcnow()),
+                )
+            except sqlite3.IntegrityError:
+                pass
             g.db.commit()
-            log_event("user_create", "users", f"Benutzer {data['display_name']} angelegt")
+            log_event("user_create", "users", f"Leser {data['display_name']} eingeladen", owned_profile["id"])
             if get_require_email_verification():
                 ok, msg = issue_email_verification(user_id, data["email"], data["display_name"])
                 push_toast(msg, "success" if ok else "warning", "E-Mail-Bestätigung")
-            push_toast("Der Benutzer wurde angelegt.", "success", "Benutzer erstellt")
+            push_toast("Der Leser wurde angelegt und freigeschaltet.", "success", "Einladung erstellt")
         except sqlite3.IntegrityError:
             push_toast("Diese E-Mail-Adresse ist bereits vergeben.", "danger", "Benutzer nicht erstellt")
         return redirect(url_for("management"))

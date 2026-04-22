@@ -23,26 +23,22 @@
 
   {% if owned_profile %}
     <div class="row g-4 mb-4">
-      {% if g.user['is_admin'] %}
-        <div class="col-xl-5">
-          <div class="page-shell p-4 h-100">
-            <div class="section-label mb-2">Benutzerverwaltung</div>
-            <h2 class="h4 mb-3">Gib deinen digitalen Nachlass an eine vertrauensvolle Person frei</h2>
-            <form method="post" action="{{ url_for('create_user') }}" class="vstack gap-3" novalidate>
-              {{ csrf_input() }}
-              <input class="form-control" name="display_name" minlength="2" placeholder="Name" required>
-              <input type="email" class="form-control" name="email" placeholder="E-Mail-Adresse" required>
-              <input type="password" class="form-control" name="password" placeholder="Passwort mit mindestens 10 Zeichen" minlength="10" required>
-              <select class="form-select" name="role">
-                <option value="reader">Leser</option>
-                <option value="creator">Ersteller</option>
-              </select>
-              <button class="btn btn-primary">Benutzer speichern</button>
-            </form>
-          </div>
+      <div class="col-xl-5">
+        <div class="page-shell p-4 h-100">
+          <div class="section-label mb-2">Leser einladen</div>
+          <h2 class="h4 mb-3">Gib deinen Nachlass bewusst an eine vertrauensvolle Person frei</h2>
+          <form method="post" action="{{ url_for('create_user') }}" class="vstack gap-3" novalidate>
+            {{ csrf_input() }}
+            <input class="form-control" name="display_name" minlength="2" placeholder="Name" required>
+            <input type="email" class="form-control" name="email" placeholder="E-Mail-Adresse" required>
+            <input type="hidden" name="role" value="reader">
+            <input type="password" class="form-control" name="password" placeholder="Start-Passwort (mind. 10 Zeichen)" minlength="10" required>
+            <button class="btn btn-primary">Einladung erstellen</button>
+          </form>
+          <div class="small text-secondary mt-3">Der Leser sieht nur explizit freigegebene Inhalte. Freigaben können Sie unten jederzeit anpassen oder entfernen.</div>
         </div>
-      {% endif %}
-      <div class="{% if g.user['is_admin'] %}col-xl-7{% else %}col-12{% endif %}">
+      </div>
+      <div class="col-xl-7">
         <div class="page-shell p-4 h-100">
           <div class="section-label mb-2">Freigaben</div>
           <h2 class="h4 mb-3">Zugriff bewusst und nachvollziehbar vergeben</h2>
