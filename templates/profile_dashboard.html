@@ -6,6 +6,9 @@
       <div class="me-lg-3">
         <p class="section-label mb-2">Digitaler Nachlass</p>
         <h1 class="h3 mb-0">{{ profile['title'] }}</h1>
+        {% if g.user['id'] != profile['owner_user_id'] %}
+          <div class="small text-secondary mt-2">Sie sehen diesen Nachlass als Leser (Freigabe von {{ profile['owner_name'] }}). Nicht freigegebene Bereiche bleiben gesperrt.</div>
+        {% endif %}
       </div>
       <div class="d-flex flex-column align-items-start align-items-lg-end gap-2">
         <div class="d-flex flex-wrap justify-content-lg-end gap-2">

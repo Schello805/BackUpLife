@@ -54,7 +54,7 @@ BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
 DEFAULT_DB_PATH = INSTANCE_DIR / "aeterna.db"
 DEFAULT_UPLOAD_DIR = INSTANCE_DIR / "uploads"
-APP_VERSION = "0.1.4"
+APP_VERSION = "0.1.5"
 TERMS_VERSION = "2026-04-10"
 GITHUB_REPO = "Schello805/BackUpLife"
 GITHUB_PROJECT_URL = "https://github.com/Schello805/BackUpLife"
@@ -74,6 +74,12 @@ DEFAULT_RATE_LIMIT_EMAIL_WINDOW_SECONDS = 24 * 60 * 60
 DEFAULT_RATE_LIMIT_EMAIL_COOLDOWN_SECONDS = 60
 DEFAULT_SESSION_LIFETIME_MINUTES = 120
 DEFAULT_RECAPTCHA_MIN_SCORE = 0.5
+DEFAULT_SECURITY_LOGIN_EMAIL_WINDOW_SECONDS = 30 * 60
+DEFAULT_SECURITY_ACTIVITY_EMAIL_WINDOW_SECONDS = 10 * 60
+DEFAULT_SUSPICIOUS_TOTAL_ACCESS_PER_MINUTE = 15
+DEFAULT_SUSPICIOUS_DOWNLOADS_PER_MINUTE = 10
+DEFAULT_SUSPICIOUS_SECRET_VIEWS_PER_MINUTE = 8
+DEFAULT_SUSPICIOUS_EXPORTS_PER_MINUTE = 4
 
 LOCAL_TZ = timezone.utc
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -785,14 +791,7 @@ def rate_limit_check(action: str, key: str, limit: int, window_seconds: int) -> 
             (action, key, window, utcnow()),
         )
         g.db.commit()
-    return True
-
-
-def rate_limit_email(action: str, email: str, limit: int, window_seconds: int) -> bool:
-    normalized = normalize_email(email or "")
-    if not normalized:
         return True
-    return rate_limit_check(action, f"email:{normalized}", limit, window_seconds)
     count = int(row["count"] or 0) + 1
     g.db.execute(
         "UPDATE rate_limits SET count = ?, updated_at = ? WHERE action = ? AND key = ?",
@@ -800,6 +799,13 @@ def rate_limit_email(action: str, email: str, limit: int, window_seconds: int) -
     )
     g.db.commit()
     return count <= limit
+
+
+def rate_limit_email(action: str, email: str, limit: int, window_seconds: int) -> bool:
+    normalized = normalize_email(email or "")
+    if not normalized:
+        return True
+    return rate_limit_check(action, f"email:{normalized}", limit, window_seconds)
 
 
 def throttle_key(email: str, ip: str) -> str:
@@ -1032,6 +1038,8 @@ def init_db(app: Flask) -> None:
         totp_enabled INTEGER NOT NULL DEFAULT 0,
         totp_backup_codes_encrypted TEXT NOT NULL DEFAULT '',
         totp_enabled_at TEXT,
+        security_email_login INTEGER NOT NULL DEFAULT 0,
+        security_email_activity INTEGER NOT NULL DEFAULT 0,
         annual_reminder_enabled INTEGER NOT NULL DEFAULT 1,
         annual_reminder_last_sent_at TEXT,
         active INTEGER NOT NULL DEFAULT 1,
@@ -1248,6 +1256,13 @@ def init_db(app: Flask) -> None:
         db.execute("ALTER TABLE users ADD COLUMN annual_reminder_enabled INTEGER NOT NULL DEFAULT 1")
     if "annual_reminder_last_sent_at" not in user_cols:
         db.execute("ALTER TABLE users ADD COLUMN annual_reminder_last_sent_at TEXT")
+    user_cols = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+    if "security_email_login" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN security_email_login INTEGER NOT NULL DEFAULT 0")
+        db.execute("UPDATE users SET security_email_login = 1 WHERE is_creator = 1")
+    if "security_email_activity" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN security_email_activity INTEGER NOT NULL DEFAULT 0")
+        db.execute("UPDATE users SET security_email_activity = 1 WHERE is_creator = 1")
 
     doc_cols = {row["name"] for row in db.execute("PRAGMA table_info(documents)").fetchall()}
     if "size_bytes" not in doc_cols:
@@ -1464,13 +1479,28 @@ def create_user_with_profile(
     is_admin = 1 if role == "admin" else 0
     is_creator = 1 if role in {"admin", "creator"} else 0
     is_reader = 1 if role == "reader" else 0
+    security_email_login = 1 if is_creator else 0
+    security_email_activity = 1 if is_creator else 0
     cursor = g.db.execute(
         """
         INSERT INTO users (
-            display_name, email, password_hash, is_admin, is_creator, is_reader, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            display_name, email, password_hash, is_admin, is_creator, is_reader,
+            security_email_login, security_email_activity,
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (display_name, email, hash_password(password), is_admin, is_creator, is_reader, now, now),
+        (
+            display_name,
+            email,
+            hash_password(password),
+            is_admin,
+            is_creator,
+            is_reader,
+            security_email_login,
+            security_email_activity,
+            now,
+            now,
+        ),
     )
     user_id = cursor.lastrowid
     if is_creator:
@@ -1713,6 +1743,93 @@ def log_event(
         ),
     )
     g.db.commit()
+
+
+def env_int(name: str, default: int) -> int:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return int(default)
+    try:
+        return int(raw)
+    except ValueError:
+        return int(default)
+
+
+def maybe_log_suspicious_access_marker(profile_id: int, actor_user_id: int) -> None:
+    """
+    Lightweight heuristic: if a single user performs unusually many sensitive actions in a short time window,
+    emit a dedicated audit log entry that can be monitored by admins and creators.
+    """
+    window_seconds = 60
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=window_seconds)).replace(microsecond=0).isoformat()
+    params = (profile_id, actor_user_id, cutoff)
+    total = g.db.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM activity_logs
+        WHERE profile_id = ? AND user_id = ?
+          AND event_type IN ('document_download', 'secret_view', 'export')
+          AND created_at >= ?
+        """,
+        params,
+    ).fetchone()["count"]
+    downloads = g.db.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM activity_logs
+        WHERE profile_id = ? AND user_id = ? AND event_type = 'document_download' AND created_at >= ?
+        """,
+        params,
+    ).fetchone()["count"]
+    secrets_count = g.db.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM activity_logs
+        WHERE profile_id = ? AND user_id = ? AND event_type = 'secret_view' AND created_at >= ?
+        """,
+        params,
+    ).fetchone()["count"]
+    exports = g.db.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM activity_logs
+        WHERE profile_id = ? AND user_id = ? AND event_type = 'export' AND created_at >= ?
+        """,
+        params,
+    ).fetchone()["count"]
+
+    total_limit = env_int("BACKUPLIFE_SUSPICIOUS_TOTAL_ACCESS_PER_MINUTE", DEFAULT_SUSPICIOUS_TOTAL_ACCESS_PER_MINUTE)
+    downloads_limit = env_int("BACKUPLIFE_SUSPICIOUS_DOWNLOADS_PER_MINUTE", DEFAULT_SUSPICIOUS_DOWNLOADS_PER_MINUTE)
+    secrets_limit = env_int("BACKUPLIFE_SUSPICIOUS_SECRET_VIEWS_PER_MINUTE", DEFAULT_SUSPICIOUS_SECRET_VIEWS_PER_MINUTE)
+    exports_limit = env_int("BACKUPLIFE_SUSPICIOUS_EXPORTS_PER_MINUTE", DEFAULT_SUSPICIOUS_EXPORTS_PER_MINUTE)
+
+    suspicious = []
+    if int(total) >= total_limit:
+        suspicious.append(f"gesamt {total}/{window_seconds}s")
+    if int(downloads) >= downloads_limit:
+        suspicious.append(f"Downloads {downloads}/{window_seconds}s")
+    if int(secrets_count) >= secrets_limit:
+        suspicious.append(f"Passwörter {secrets_count}/{window_seconds}s")
+    if int(exports) >= exports_limit:
+        suspicious.append(f"Exporte {exports}/{window_seconds}s")
+    if not suspicious:
+        return
+
+    # Avoid spamming: emit at most once per actor/profile/window.
+    if not rate_limit_check(
+        "security_suspicious_marker",
+        f"user:{actor_user_id}|profile:{profile_id}",
+        1,
+        window_seconds,
+    ):
+        return
+    log_event(
+        "security_suspicious",
+        "security",
+        "Verdachtsmarker: ungewöhnlich viele Zugriffe (" + ", ".join(suspicious) + ")",
+        profile_id=profile_id,
+        user_id=actor_user_id,
+    )
 
 
 def get_profile_by_slug(slug: str) -> sqlite3.Row | None:
@@ -2270,7 +2387,135 @@ def render_email_html(
 	        </div>
 	      </body>
 	    </html>
-	    """
+		    """
+
+
+def get_smtp_settings_cached() -> sqlite3.Row | None:
+    cached = getattr(g, "_smtp_settings_cached", None)
+    if cached is not None:
+        return cached
+    try:
+        row = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
+    except Exception:
+        row = None
+    g._smtp_settings_cached = row
+    return row
+
+
+def is_security_email_enabled(user: sqlite3.Row, kind: str) -> bool:
+    column = "security_email_login" if kind == "login" else "security_email_activity"
+    try:
+        if column in user.keys():
+            return bool(int(user[column]))  # type: ignore[index]
+    except Exception:
+        return False
+    return False
+
+
+def maybe_send_security_email(
+    recipient_user: sqlite3.Row,
+    *,
+    subject: str,
+    title: str,
+    lead: str,
+    body_lines: list[str],
+    button_label: str | None = None,
+    button_url: str | None = None,
+    footer_note: str | None = None,
+) -> None:
+    if not recipient_user:
+        return
+    if not (recipient_user["email"] or "").strip():
+        return
+    if not recipient_user["email_verified_at"]:
+        return
+    smtp_settings = get_smtp_settings_cached()
+    if not is_smtp_configured(smtp_settings):
+        return
+    text = "\n".join([line.replace("\n", " ").strip() for line in body_lines if line.strip()])
+    if button_url:
+        text = f"{text}\n\n{button_url}\n"
+    html_body = render_email_html(title, lead, body_lines, button_label, button_url, footer_note)
+    send_test_or_reset_mail(smtp_settings, recipient_user["email"], subject, text, html_body)
+
+
+def maybe_send_login_notice(user: sqlite3.Row, ip: str, user_agent: str) -> None:
+    if not user or not user["is_creator"]:
+        return
+    if not is_security_email_enabled(user, "login"):
+        return
+    window = env_int("BACKUPLIFE_SECURITY_LOGIN_EMAIL_WINDOW_SECONDS", DEFAULT_SECURITY_LOGIN_EMAIL_WINDOW_SECONDS)
+    if not rate_limit_check("security_login_notice", f"user:{user['id']}|ip:{ip}", 1, window):
+        return
+    now_label = dt_de(utcnow()) if has_request_context() else utcnow()
+    forgot_url = build_external_url("forgot_password")
+    account_url = build_external_url("account_settings")
+    maybe_send_security_email(
+        user,
+        subject="BackUpLife: Neuer Login",
+        title="Neuer Login",
+        lead="Ein neues Anmelden-Ereignis wurde für Ihr BackUpLife-Konto erkannt.",
+        body_lines=[
+            f"Zeitpunkt: {now_label}",
+            f"IP-Adresse: {ip or 'unbekannt'}",
+            f"User-Agent: {user_agent or 'unbekannt'}",
+            "",
+            "Wenn Sie das waren: alles gut.",
+            "Wenn nicht: Bitte ändern Sie sofort Ihr Passwort und aktivieren Sie 2FA (falls verfügbar).",
+        ],
+        button_label="Zum Konto",
+        button_url=account_url,
+        footer_note=f"Passwort-Reset: {forgot_url}",
+    )
+
+
+def maybe_send_profile_activity_notice(
+    *,
+    profile: sqlite3.Row,
+    actor: sqlite3.Row,
+    event_type: str,
+    action_label: str,
+    item_label: str,
+    ip: str,
+) -> None:
+    if not profile or not actor:
+        return
+    owner_id = int(profile["owner_user_id"])
+    actor_id = int(actor["id"])
+    if owner_id == actor_id:
+        return
+    owner = g.db.execute("SELECT * FROM users WHERE id = ? AND active = 1", (owner_id,)).fetchone()
+    if not owner or not owner["is_creator"]:
+        return
+    if not is_security_email_enabled(owner, "activity"):
+        return
+    window = env_int("BACKUPLIFE_SECURITY_ACTIVITY_EMAIL_WINDOW_SECONDS", DEFAULT_SECURITY_ACTIVITY_EMAIL_WINDOW_SECONDS)
+    if not rate_limit_check(
+        "security_activity_notice",
+        f"owner:{owner_id}|profile:{profile['id']}|actor:{actor_id}|type:{event_type}",
+        1,
+        window,
+    ):
+        return
+    now_label = dt_de(utcnow()) if has_request_context() else utcnow()
+    management_url = build_external_url("management")
+    maybe_send_security_email(
+        owner,
+        subject="BackUpLife: Zugriff auf Ihren Nachlass",
+        title="Zugriff protokolliert",
+        lead="In Ihrem Nachlass wurde eine Aktion ausgeführt, die Sie nachvollziehen sollten.",
+        body_lines=[
+            f"Nachlass: {profile['title']}",
+            f"Akteur: {actor['display_name']} ({actor['email']})",
+            f"Aktion: {action_label}",
+            f"Objekt: {item_label}",
+            f"Zeitpunkt: {now_label}",
+            f"IP-Adresse: {ip or 'unbekannt'}",
+        ],
+        button_label="Zum Audit-Log",
+        button_url=management_url,
+        footer_note="Hinweis: Diese E-Mail wird gedrosselt, um Spam zu vermeiden (mehr Details im Audit-Log).",
+    )
 
 
 def register_routes(app: Flask) -> None:
@@ -2502,6 +2747,7 @@ self.addEventListener('fetch', (event) => {
                 session["user_id"] = user["id"]
                 session["active_profile_slug"] = target_slug
                 log_event("login_success", "auth", f"Login erfolgreich für {user['display_name']}", user_id=user["id"])
+                maybe_send_login_notice(user, ip, request.user_agent.string[:500])
                 push_toast(f"Willkommen zurück, {user['display_name']}.", "success", "Anmeldung erfolgreich")
                 next_url = request.args.get("next")
                 if target_slug:
@@ -2576,6 +2822,7 @@ self.addEventListener('fetch', (event) => {
                 f"Login erfolgreich (2FA) für {user['display_name']}",
                 user_id=user["id"],
             )
+            maybe_send_login_notice(user, ip, request.user_agent.string[:500])
             push_toast(
                 "Anmeldung abgeschlossen." + (" (Backup-Code verwendet)" if used_backup else ""),
                 "success",
@@ -3001,8 +3248,10 @@ self.addEventListener('fetch', (event) => {
         profiles = get_visible_profiles(g.user)
         if profiles and not session.get("active_profile_slug"):
             session["active_profile_slug"] = profiles[0]["slug"]
-        summary = []
+        owned_entries: list[dict[str, Any]] = []
+        shared_entries: list[dict[str, Any]] = []
         for profile in profiles:
+            is_owner = g.user["id"] == profile["owner_user_id"]
             record_count = g.db.execute(
                 "SELECT COUNT(*) AS count FROM records WHERE profile_id = ?", (profile["id"],)
             ).fetchone()["count"]
@@ -3014,7 +3263,7 @@ self.addEventListener('fetch', (event) => {
             ).fetchone()["count"]
             categories = get_profile_categories(profile["id"])
             completion = None
-            if g.user["id"] == profile["owner_user_id"]:
+            if is_owner:
                 total = len(categories)
                 applicable = [c for c in categories if c["is_applicable"]]
                 completed = [c for c in applicable if c["is_complete"]]
@@ -3030,20 +3279,34 @@ self.addEventListener('fetch', (event) => {
                     "not_applicable_total": len(not_applicable),
                     "percent": int(round((done_total / total) * 100)) if total else 100,
                 }
-            summary.append(
-                {
-                    "profile": profile,
-                    "record_count": record_count,
-                    "document_count": document_count,
-                    "grant_count": grant_count,
-                    "categories": categories,
-                    "completion": completion,
-                    "emergency_url": build_emergency_url(profile["slug"]),
-                    "emergency_qr_svg": build_qr_svg(build_emergency_url(profile["slug"])),
-                }
-            )
+            entry = {
+                "profile": profile,
+                "record_count": record_count,
+                "document_count": document_count,
+                "grant_count": grant_count,
+                "categories": categories,
+                "completion": completion,
+                "emergency_url": build_emergency_url(profile["slug"]),
+                "emergency_qr_svg": build_qr_svg(build_emergency_url(profile["slug"])),
+                "is_owner": is_owner,
+            }
+            if is_owner:
+                owned_entries.append(entry)
+            else:
+                shared_entries.append(entry)
         recent_logs = get_relevant_logs(g.user, get_profile_for_owner(g.user["id"]) if g.user["is_creator"] else None)[:10]
-        return render_template("dashboard.html", summaries=summary, recent_logs=recent_logs)
+        show_2fa_reminder = bool(
+            current_app.config.get("ENABLE_2FA")
+            and g.user["is_creator"]
+            and not g.user["totp_enabled"]
+        )
+        return render_template(
+            "dashboard.html",
+            owned_entries=owned_entries,
+            shared_entries=shared_entries,
+            recent_logs=recent_logs,
+            show_2fa_reminder=show_2fa_reminder,
+        )
 
     @app.route("/konto", methods=["GET", "POST"])
     @login_required
@@ -3090,15 +3353,28 @@ self.addEventListener('fetch', (event) => {
                 return redirect(url_for("account_settings"))
             if form_id == "notifications":
                 enabled = 1 if request.form.get("annual_reminder_enabled") else 0
+                security_login = 1 if request.form.get("security_email_login") else 0
+                security_activity = 1 if request.form.get("security_email_activity") else 0
+                # Readers don't need creator security notifications by default.
+                if not g.user["is_creator"]:
+                    security_login = 0
+                    security_activity = 0
                 g.db.execute(
-                    "UPDATE users SET annual_reminder_enabled = ?, updated_at = ? WHERE id = ?",
-                    (enabled, utcnow(), g.user["id"]),
+                    """
+                    UPDATE users
+                    SET annual_reminder_enabled = ?,
+                        security_email_login = ?,
+                        security_email_activity = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (enabled, security_login, security_activity, utcnow(), g.user["id"]),
                 )
                 g.db.commit()
                 log_event(
                     "account_notifications_update",
                     "account",
-                    f"Jahres-Erinnerung {'aktiviert' if enabled else 'deaktiviert'}",
+                    "Benachrichtigungen aktualisiert",
                     user_id=g.user["id"],
                 )
                 push_toast("Benachrichtigungen wurden gespeichert.", "success", "Benachrichtigungen")
@@ -3576,6 +3852,15 @@ self.addEventListener('fetch', (event) => {
             abort(404)
         secret = decrypt_secret(record["secret_encrypted"])
         log_event("secret_view", "records", f"Passwort für Eintrag {record_id} angezeigt", profile["id"])
+        maybe_send_profile_activity_notice(
+            profile=profile,
+            actor=g.user,
+            event_type="secret_view",
+            action_label="Passwort angezeigt",
+            item_label=f"{category_label(category_key)}: {record['title']}",
+            ip=get_client_ip(),
+        )
+        maybe_log_suspicious_access_marker(profile["id"], g.user["id"])
         return render_template(
             "secret_view.html",
             profile=profile,
@@ -3656,6 +3941,15 @@ self.addEventListener('fetch', (event) => {
             abort(404)
         ensure_profile_access(profile, document["category_key"])
         log_event("document_download", "documents", f"Dokument {document_id} heruntergeladen", profile["id"])
+        maybe_send_profile_activity_notice(
+            profile=profile,
+            actor=g.user,
+            event_type="document_download",
+            action_label="Dokument heruntergeladen",
+            item_label=document["original_name"] or document["title"] or f"Dokument {document_id}",
+            ip=get_client_ip(),
+        )
+        maybe_log_suspicious_access_marker(profile["id"], g.user["id"])
         return send_from_directory(
             app.config["UPLOAD_DIR"],
             document["stored_name"],
@@ -3766,6 +4060,7 @@ self.addEventListener('fetch', (event) => {
         owned_profile = get_profile_for_owner(g.user["id"]) if g.user["is_creator"] else None
         users = []
         grants = []
+        granted_summaries: list[dict[str, Any]] = []
         if owned_profile:
             if g.user["is_admin"]:
                 users = g.db.execute(
@@ -3794,6 +4089,39 @@ self.addEventListener('fetch', (event) => {
                 """,
                 (owned_profile["id"],),
             ).fetchall()
+        else:
+            # Reader view: list what is currently shared with this user.
+            profiles = get_visible_profiles(g.user)
+            scope_rows = g.db.execute(
+                """
+                SELECT profile_id, category_key
+                FROM grants
+                WHERE grantee_user_id = ?
+                ORDER BY profile_id, category_key
+                """,
+                (g.user["id"],),
+            ).fetchall()
+            scope_map: dict[int, list[str | None]] = {}
+            for row in scope_rows:
+                pid = int(row["profile_id"])
+                scope_map.setdefault(pid, []).append(row["category_key"])
+            for profile in profiles:
+                pid = int(profile["id"])
+                scopes = scope_map.get(pid, [])
+                if any(scope is None for scope in scopes):
+                    scope_label = "Gesamter Nachlass"
+                else:
+                    labels = [category_label(scope) for scope in scopes if scope]
+                    # Preserve order while de-duplicating.
+                    seen: set[str] = set()
+                    ordered = []
+                    for label in labels:
+                        if label in seen:
+                            continue
+                        seen.add(label)
+                        ordered.append(label)
+                    scope_label = ", ".join(ordered) if ordered else "—"
+                granted_summaries.append({"profile": profile, "scope_label": scope_label})
         page_size = 50
         try:
             log_page = max(1, int(request.args.get("log_page", "1")))
@@ -3806,6 +4134,7 @@ self.addEventListener('fetch', (event) => {
             owned_profile=owned_profile,
             users=users,
             grants=grants,
+            granted_summaries=granted_summaries,
             logs=logs_page,
             log_page=log_page,
             log_page_count=len(logs_page),
@@ -3993,6 +4322,15 @@ self.addEventListener('fetch', (event) => {
             categories.append({"key": key, "label": label, "records": records, "documents": docs})
         wishes = g.db.execute("SELECT * FROM wishes WHERE profile_id = ?", (profile["id"],)).fetchone()
         log_event("export", "export", "Druckexport geöffnet", profile["id"])
+        maybe_send_profile_activity_notice(
+            profile=profile,
+            actor=g.user,
+            event_type="export",
+            action_label="Druckexport geöffnet",
+            item_label="Druckansicht (Export)",
+            ip=get_client_ip(),
+        )
+        maybe_log_suspicious_access_marker(profile["id"], g.user["id"])
         return render_template(
             "export.html",
             profile=profile,

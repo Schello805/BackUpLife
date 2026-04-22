@@ -12,9 +12,15 @@
         <div class="subtle-card p-4 bg-white text-dark">
           <div class="section-label mb-2">Merksatz</div>
           <ul class="hint-list ps-0 mb-0">
-            <li>Ersteller sehen nur den eigenen Nachlass</li>
-            <li>Leser erhalten nur explizit freigegebene Inhalte</li>
-            <li>Admin verwaltet System und SMTP separat</li>
+            {% if owned_profile %}
+              <li>Ersteller verwalten Einladungen und Freigaben zentral</li>
+              <li>Leser erhalten nur explizit freigegebene Inhalte</li>
+              <li>Jeder Zugriff bleibt im Audit-Log nachvollziehbar</li>
+            {% else %}
+              <li>Sie sehen hier nur Ihre freigegebenen Bereiche</li>
+              <li>Nicht freigegebene Kategorien bleiben gesperrt</li>
+              <li>Zugriffe und Downloads sind nachvollziehbar</li>
+            {% endif %}
           </ul>
         </div>
       </div>
@@ -152,6 +158,39 @@
         </div>
       </div>
     {% endif %}
+  {% endif %}
+
+  {% if not owned_profile and granted_summaries %}
+    <div class="page-shell p-4 mb-4">
+      <div class="section-label mb-2">Freigaben</div>
+      <h2 class="h4 mb-3">Was Ihnen aktuell freigegeben wurde</h2>
+      <div class="surface-table">
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Nachlass</th>
+                <th>Ersteller</th>
+                <th>Umfang</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in granted_summaries %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for('profile_dashboard', slug=entry.profile['slug']) }}">{{ entry.profile['title'] }}</a>
+                    <div class="small text-secondary">{{ entry.profile['slug'] }}</div>
+                  </td>
+                  <td>{{ entry.profile['owner_name'] }}</td>
+                  <td class="small">{{ entry.scope_label }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="small text-secondary mt-3">Hinweis: Die genaue Berechtigung pro Kategorie sehen Sie auch auf dem Dashboard (gesperrte Karten bleiben deaktiviert).</div>
+    </div>
   {% endif %}
 
 	  <div class="page-shell p-4">

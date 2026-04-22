@@ -211,11 +211,25 @@
     <div class="col-12">
       <div class="page-shell p-4 p-lg-5" id="notifications">
         <div class="section-label mb-2">Benachrichtigungen</div>
-        <h2 class="h4 mb-3">Erinnerungen (optional)</h2>
-        <p class="text-secondary mb-4">Einmal jährlich erinnern wir Ersteller freundlich daran, den Nachlass kurz zu prüfen. Das hilft, damit im Ernstfall nichts veraltet ist.</p>
+        <h2 class="h4 mb-3">E-Mails & Erinnerungen (optional)</h2>
+        <p class="text-secondary mb-4">Sie entscheiden, welche E-Mails BackUpLife verschicken soll. Sicherheitshinweise helfen, ungewöhnliche Logins oder Zugriffe früh zu bemerken.</p>
         <form method="post" class="vstack gap-3" novalidate>
           {{ csrf_input() }}
           <input type="hidden" name="form_id" value="notifications">
+          {% if g.user['is_creator'] %}
+            <div class="subtle-card p-3 bg-white">
+              <div class="fw-semibold mb-1">Sicherheit</div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="security_email_login" id="security_email_login" {% if g.user['security_email_login'] %}checked{% endif %}>
+                <label class="form-check-label" for="security_email_login">E-Mail bei neuen Logins senden</label>
+              </div>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" name="security_email_activity" id="security_email_activity" {% if g.user['security_email_activity'] %}checked{% endif %}>
+                <label class="form-check-label" for="security_email_activity">E-Mail bei Downloads/Passwortanzeigen/Exporten senden</label>
+              </div>
+              <div class="form-text">Hinweis: Die E-Mails werden gedrosselt, um Spam zu vermeiden. Details stehen immer im Audit-Log.</div>
+            </div>
+          {% endif %}
           <div class="form-check">
             <input class="form-check-input" type="checkbox" name="annual_reminder_enabled" id="annual_reminder_enabled" {% if g.user['annual_reminder_enabled'] %}checked{% endif %}>
             <label class="form-check-label" for="annual_reminder_enabled">Jährliche Erinnerung per E-Mail aktivieren</label>
