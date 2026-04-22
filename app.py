@@ -1148,6 +1148,9 @@ def init_db(app: Flask) -> None:
         recaptcha_site_key TEXT NOT NULL DEFAULT '',
         recaptcha_secret_encrypted TEXT NOT NULL DEFAULT '',
         backup_password_encrypted TEXT NOT NULL DEFAULT '',
+        admin_alert_email_enabled INTEGER NOT NULL DEFAULT 0,
+        admin_alert_email_suspicious INTEGER NOT NULL DEFAULT 1,
+        admin_alert_email_lockout INTEGER NOT NULL DEFAULT 1,
         updated_by INTEGER,
         updated_at TEXT NOT NULL DEFAULT ''
     );
@@ -1296,6 +1299,12 @@ def init_db(app: Flask) -> None:
         db.execute("ALTER TABLE app_settings ADD COLUMN recaptcha_secret_encrypted TEXT NOT NULL DEFAULT ''")
     if "backup_password_encrypted" not in app_cols:
         db.execute("ALTER TABLE app_settings ADD COLUMN backup_password_encrypted TEXT NOT NULL DEFAULT ''")
+    if "admin_alert_email_enabled" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN admin_alert_email_enabled INTEGER NOT NULL DEFAULT 0")
+    if "admin_alert_email_suspicious" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN admin_alert_email_suspicious INTEGER NOT NULL DEFAULT 1")
+    if "admin_alert_email_lockout" not in app_cols:
+        db.execute("ALTER TABLE app_settings ADD COLUMN admin_alert_email_lockout INTEGER NOT NULL DEFAULT 1")
 
     # Enforce exactly one admin in the database: keep the earliest admin, demote the rest.
     try:
@@ -1830,6 +1839,28 @@ def maybe_log_suspicious_access_marker(profile_id: int, actor_user_id: int) -> N
         profile_id=profile_id,
         user_id=actor_user_id,
     )
+    try:
+        profile = g.db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+        actor = g.db.execute("SELECT * FROM users WHERE id = ?", (actor_user_id,)).fetchone()
+    except Exception:
+        profile = None
+        actor = None
+    if profile and actor:
+        maybe_send_admin_alert(
+            alert_type="suspicious",
+            subject="BackUpLife: Verdachtsmarker (Zugriffe)",
+            title="Verdachtsmarker",
+            lead="Es gab ungewöhnlich viele Zugriffe in kurzer Zeit.",
+            body_lines=[
+                f"Nachlass: {profile['title']}",
+                f"Akteur: {actor['display_name']} ({actor['email']})",
+                f"Marker: {', '.join(suspicious)}",
+                f"IP-Adresse: {get_client_ip() or 'unbekannt'}",
+                f"Pfad: {request.path}",
+            ],
+            throttle_key=f"suspicious|profile:{profile_id}|actor:{actor_user_id}",
+            throttle_window_seconds=10 * 60,
+        )
 
 
 def get_profile_by_slug(slug: str) -> sqlite3.Row | None:
@@ -2518,6 +2549,61 @@ def maybe_send_profile_activity_notice(
     )
 
 
+def get_admin_user() -> sqlite3.Row | None:
+    try:
+        return g.db.execute("SELECT * FROM users WHERE is_admin = 1 AND active = 1 LIMIT 1").fetchone()
+    except Exception:
+        return None
+
+
+def admin_alert_setting_enabled(app_settings: sqlite3.Row | None, column: str) -> bool:
+    if not app_settings:
+        return False
+    try:
+        if column not in app_settings.keys():
+            return False
+        if not int(app_settings["admin_alert_email_enabled"] or 0):
+            return False
+        return bool(int(app_settings[column] or 0))
+    except Exception:
+        return False
+
+
+def maybe_send_admin_alert(
+    *,
+    app_settings: sqlite3.Row | None = None,
+    alert_type: str,
+    subject: str,
+    title: str,
+    lead: str,
+    body_lines: list[str],
+    throttle_key: str,
+    throttle_window_seconds: int,
+) -> None:
+    settings = app_settings or get_app_settings_row()
+    column = {
+        "suspicious": "admin_alert_email_suspicious",
+        "lockout": "admin_alert_email_lockout",
+    }.get(alert_type)
+    if not column or not admin_alert_setting_enabled(settings, column):
+        return
+    admin_user = get_admin_user()
+    if not admin_user:
+        return
+    if not rate_limit_check("admin_alert_email", throttle_key, 1, throttle_window_seconds):
+        return
+    maybe_send_security_email(
+        admin_user,
+        subject=subject,
+        title=title,
+        lead=lead,
+        body_lines=body_lines,
+        button_label="Zum Audit-Log",
+        button_url=build_external_url("admin_logs"),
+        footer_note="Hinweis: Diese Admin-Warnung ist gedrosselt. Details stehen im Audit-Log.",
+    )
+
+
 def register_routes(app: Flask) -> None:
     @app.route("/")
     def index():
@@ -2718,7 +2804,29 @@ self.addEventListener('fetch', (event) => {
             ).fetchone()
             if not user or not verify_password(password, user["password_hash"]):
                 log_event("login_failed", "auth", f"Fehlgeschlagener Login für {email}")
-                auth_throttle_register_failure(email, ip or "unknown")
+                fail_count = auth_throttle_register_failure(email, ip or "unknown")
+                if fail_count in {5, 10, 15}:
+                    lock_seconds = get_lockout_seconds_for_fail_count(fail_count)
+                    minutes = max(1, int(round(lock_seconds / 60))) if lock_seconds else 0
+                    log_event(
+                        "security_lockout",
+                        "security",
+                        f"Verdachtsmarker: Login-Fehlversuche ausgelöst (E-Mail: {email}, IP: {ip or 'unbekannt'}, Sperre: {minutes} min)",
+                    )
+                    maybe_send_admin_alert(
+                        alert_type="lockout",
+                        subject="BackUpLife: Verdachtsmarker (Login-Sperre)",
+                        title="Login-Sperre ausgelöst",
+                        lead="Es gab viele fehlgeschlagene Logins in kurzer Zeit.",
+                        body_lines=[
+                            f"E-Mail: {email}",
+                            f"IP-Adresse: {ip or 'unbekannt'}",
+                            f"Sperre: {minutes} Minute(n)",
+                            f"User-Agent: {request.user_agent.string[:200] or 'unbekannt'}",
+                        ],
+                        throttle_key=f"lockout|email:{email}|ip:{ip or 'unknown'}|level:{fail_count}",
+                        throttle_window_seconds=30 * 60,
+                    )
                 push_toast("Bitte prüfen Sie E-Mail-Adresse und Passwort.", "danger", "Anmeldung fehlgeschlagen")
             elif get_require_email_verification() and not user["email_verified_at"]:
                 log_event("login_blocked_unverified", "auth", f"Login blockiert (E-Mail unbestätigt) für {email}")
@@ -4412,6 +4520,12 @@ self.addEventListener('fetch', (event) => {
             if form_id == "security":
                 allow_registration = 1 if request.form.get("allow_registration") else 0
                 require_email_verification = 1 if request.form.get("require_email_verification") else 0
+                admin_alert_email_enabled = 1 if request.form.get("admin_alert_email_enabled") else 0
+                admin_alert_email_suspicious = 1 if request.form.get("admin_alert_email_suspicious") else 0
+                admin_alert_email_lockout = 1 if request.form.get("admin_alert_email_lockout") else 0
+                if not admin_alert_email_enabled:
+                    admin_alert_email_suspicious = 0
+                    admin_alert_email_lockout = 0
                 if require_email_verification:
                     smtp_settings = g.db.execute("SELECT * FROM smtp_settings WHERE id = 1").fetchone()
                     if not is_smtp_configured(smtp_settings):
@@ -4477,6 +4591,7 @@ self.addEventListener('fetch', (event) => {
                     SET allow_registration = ?, require_email_verification = ?, max_profile_storage_mb = ?,
                         admin_ip_allowlist = ?, registration_invite_hash = ?,
                         recaptcha_site_key = ?, recaptcha_secret_encrypted = ?,
+                        admin_alert_email_enabled = ?, admin_alert_email_suspicious = ?, admin_alert_email_lockout = ?,
                         updated_by = ?, updated_at = ?
                     WHERE id = 1
                     """,
@@ -4488,6 +4603,9 @@ self.addEventListener('fetch', (event) => {
                         invite_hash,
                         recaptcha_site_final,
                         recaptcha_secret_final,
+                        admin_alert_email_enabled,
+                        admin_alert_email_suspicious,
+                        admin_alert_email_lockout,
                         g.user["id"],
                         utcnow(),
                     ),

@@ -167,6 +167,54 @@
 
               <div class="col-12"><hr class="my-2"></div>
               <div class="col-12">
+                <div class="section-label mb-2">Monitoring (Admin-E-Mail)</div>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="admin_alert_email_enabled" id="admin_alert_email_enabled" {% if app_settings and app_settings['admin_alert_email_enabled'] %}checked{% endif %}>
+                  <label class="form-check-label" for="admin_alert_email_enabled">Admin-Warnungen per E-Mail aktivieren</label>
+                </div>
+                <div class="form-text">
+                  Sendet Warnungen an die Admin-E-Mail-Adresse (<code>{{ g.user['email'] }}</code>), z. B. bei Verdachtsmarkern.
+                  {% if not smtp_configured %}<strong class="text-danger">SMTP fehlt</strong> – E-Mails können dann nicht versendet werden.{% endif %}
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" name="admin_alert_email_suspicious" id="admin_alert_email_suspicious" {% if app_settings and app_settings['admin_alert_email_suspicious'] %}checked{% endif %}>
+                  <label class="form-check-label" for="admin_alert_email_suspicious">Warnung bei Verdachtsmarker (viele Downloads/Passwörter/Exporte)</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" name="admin_alert_email_lockout" id="admin_alert_email_lockout" {% if app_settings and app_settings['admin_alert_email_lockout'] %}checked{% endif %}>
+                  <label class="form-check-label" for="admin_alert_email_lockout">Warnung bei Login-Sperren (viele Fehlversuche)</label>
+                </div>
+              </div>
+              <script>
+                (function () {
+                  const master = document.getElementById('admin_alert_email_enabled');
+                  const a = document.getElementById('admin_alert_email_suspicious');
+                  const b = document.getElementById('admin_alert_email_lockout');
+                  if (!master || !a || !b) return;
+                  function syncAdminAlerts() {
+                    if (!master.checked) {
+                      a.checked = false;
+                      b.checked = false;
+                      a.disabled = true;
+                      b.disabled = true;
+                      return;
+                    }
+                    a.disabled = false;
+                    b.disabled = false;
+                  }
+                  master.addEventListener('change', syncAdminAlerts);
+                  syncAdminAlerts();
+                })();
+              </script>
+
+              <div class="col-12"><hr class="my-2"></div>
+              <div class="col-12">
                 <div class="section-label mb-2">Limits</div>
               </div>
               <div class="col-md-6">
