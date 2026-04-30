@@ -127,10 +127,11 @@
                 {% set version_value = app_version|default(APP_VERSION, true) %}
                 <span class="badge text-bg-light border ms-2">v{{ version_value }}</span>
                 {% if update_info and update_info.status == 'update_available' %}
+                  {% set update_hint = "Update auf Debian: cd ~/BackUpLife && git pull --ff-only && sudo bash update_debian13.sh && sudo systemctl restart backuplife" %}
                   {% if update_info.kind == 'commit' %}
-                    <span class="badge text-bg-warning ms-2">Update verfügbar (Commit): {{ update_info.latest }}</span>
+                    <span class="badge text-bg-warning ms-2" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ update_hint }}" style="cursor: help;">Update verfügbar (Commit): {{ update_info.latest }}</span>
                   {% else %}
-                    <span class="badge text-bg-warning ms-2">Update verfügbar: {{ update_info.latest|replace('v','') }}</span>
+                    <span class="badge text-bg-warning ms-2" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ update_hint }}" style="cursor: help;">Update verfügbar: {{ update_info.latest|replace('v','') }}</span>
                   {% endif %}
                 {% elif update_info and update_info.status == 'up_to_date' %}
                   <span class="badge text-bg-success ms-2">Aktuell</span>
@@ -154,7 +155,7 @@
             <a href="{{ url_for('terms_page') }}" class="link-secondary">Nutzungsbedingungen</a>
             <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}" target="_blank" rel="noreferrer" class="link-secondary">GitHub</a>
             {% if build_info and build_info.build_sha %}
-              <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}/commit/{{ build_info.build_sha }}" target="_blank" rel="noreferrer" class="link-secondary">Build: {{ build_info.build_sha }}</a>
+              <a href="{{ github_project_url|default(GITHUB_PROJECT_URL, true) }}/commit/{{ build_info.build_sha }}" target="_blank" rel="noreferrer" class="link-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="Running build commit (BACKUPLIFE_BUILD_SHA)">Build: {{ build_info.build_sha }}</a>
             {% endif %}
             {% if g.user and g.user['is_admin'] %}
               <a href="{{ url_for('admin') }}" class="link-secondary">Admin</a>
@@ -180,6 +181,10 @@
       document.querySelectorAll('.toast').forEach((element) => {
         const toast = new bootstrap.Toast(element);
         toast.show();
+      });
+
+      document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => {
+        new bootstrap.Tooltip(element);
       });
 
       (function () {
